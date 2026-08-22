@@ -1,17 +1,17 @@
 import csv
-import json
 import time
 from ollama import Client
 
 INPUT_CSV = "../graphs/stark-amazon/products.csv"
 OUTPUT_CSV = "../graphs/stark-amazon/products_with_embeddings.csv"
-MODEL_NAME = "qwen3-embedding:4b" 
+MODEL_NAME = "qwen3-embedding:4b"
 
 BATCH_SIZE = 32  # Anzahl Texte pro Ollama-Anfrage
 
 # Fix: CSV-Zellen dürfen standardmäßig 131.072 Chars groß sein
 # -> Setzung auf 100.000.000 Chars
 csv.field_size_limit(100000000)
+
 
 def process_batch(client: Client, batch: list[dict]) -> list[dict]:
     """Nimmt Zeilen aus products.csv entgegen, holt Embeddings von Ollama und gibt erweiterte Zeilen zurück."""
@@ -32,7 +32,7 @@ def main():
     with open(INPUT_CSV, mode="r", encoding="utf-8") as infile, open(
         OUTPUT_CSV, mode="w", encoding="utf-8", newline=""
     ) as outfile:
-        
+
         reader = csv.DictReader(infile)
         row_count = sum(1 for _ in csv.DictReader(infile))
         infile.seek(0)
@@ -70,6 +70,7 @@ def main():
             writer.writerows(processed_batch)
 
     print("Fin.")
+
 
 if __name__ == "__main__":
     main()
