@@ -1,0 +1,21 @@
+templates:
+  - name: "Find product given brand and category"
+    hops: 2
+    sampling_cypher: |
+      MATCH (b1:brand)-[:has_brand]-(target:product)-[:has_category]-(c1:category)
+      WITH b1, c1, count(DISTINCT target) AS answer_count, collect(DISTINCT target.id) AS answer_ids
+      WHERE answer_count >= 1 AND answer_count <= 10
+      RETURN b1.name AS bname, c1.name AS cname, answer_count, answer_ids
+      ORDER BY rand() 
+      LIMIT 3
+    llm_input: ('{bname}':brand)-[:has_brand]-(target:product)-[:has_category]-('{cname}':category)
+  - name: "Find colored products often bought with products of a given category"
+    hops: 3
+    sampling_cypher: |
+      MATCH (ca1:category)-[:has_category]-(:product)-[:also_buy]-(target:product)-[:has_color]-(co1:color)
+      WITH ca1, co1, count(DISTINCT target) AS answer_count, collect(DISTINCT target.id) AS answer_ids
+      WHERE answer_count >= 1 AND answer_count <= 10
+      RETURN ca1.name AS caname, co1.name AS coname, answer_count, answer_ids
+      ORDER BY rand()
+      LIMIT 3
+    llm_input: ('{caname}':category)-[:has_category]-(:product)-[:also_buy]-(target:product)-[:has_color]-('{coname}':color)
