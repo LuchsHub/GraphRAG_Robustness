@@ -6,15 +6,15 @@ INPUT_CSV = "../graphs/stark-amazon/products.csv"
 OUTPUT_CSV = "../graphs/stark-amazon/products_with_embeddings.csv"
 MODEL_NAME = "qwen3-embedding:4b"
 
-BATCH_SIZE = 32  # Anzahl Texte pro Ollama-Anfrage
+BATCH_SIZE = 32  # texts per Ollama request
 
-# Fix: CSV-Zellen dürfen standardmäßig 131.072 Chars groß sein
-# -> Setzung auf 100.000.000 Chars
+# Fix: CSV fields can only be 131.072 chars big
+# -> set to 100.000.000 chars
 csv.field_size_limit(100000000)
 
 
 def process_batch(client: Client, batch: list[dict]) -> list[dict]:
-    """Nimmt Zeilen aus products.csv entgegen, holt Embeddings von Ollama und gibt erweiterte Zeilen zurück."""
+    """Adds Ollama embedding to each row in a batch"""
     texts = [row.get("document", "") for row in batch]
 
     response = client.embed(model=MODEL_NAME, input=texts)
@@ -33,25 +33,25 @@ def main():
         OUTPUT_CSV, mode="w", encoding="utf-8", newline=""
     ) as outfile:
 
+        # count rows and reset stream pos to 0
         reader = csv.DictReader(infile)
         row_count = sum(1 for _ in csv.DictReader(infile))
         infile.seek(0)
         reader = csv.DictReader(infile)
 
+        # add embeddings header
         fieldnames = reader.fieldnames + ["embedding:float[]"]
         writer = csv.DictWriter(outfile, fieldnames=fieldnames)
         writer.writeheader()
 
         total_processed = 0
-
         batch = []
-
         start_time = time.time()
 
         for row in reader:
             batch.append(row)
 
-            # Batch voll -> Anfrage senden
+            # batch full -> send Ollama request
             if len(batch) >= BATCH_SIZE:
                 processed_batch = process_batch(client, batch)
                 writer.writerows(processed_batch)
@@ -64,7 +64,7 @@ def main():
                 print(f"Elapsed time: {elapsed_time:.1f} seconds")
                 print(f"Estimated remaining time: {eta:.1f} seconds")
 
-        # Rest-Batch verarbeiten
+        # process remaining batch
         if batch:
             processed_batch = process_batch(client, batch)
             writer.writerows(processed_batch)
