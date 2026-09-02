@@ -5,7 +5,7 @@ import csv
 
 NEO4J_URI = "bolt://localhost:17687"
 NEO4J_USER = "neo4j"
-NEO4J_PASSWORD = "Frechi2005"
+NEO4J_PASSWORD = "X"
 TEMPLATES_FILE = "rel_templates.yaml"
 
 SINGLE_TARGET_PROMPT = """You are an intelligent assistant that generates queries about Amazon items.
