@@ -12,20 +12,12 @@ SINGLE_TARGET_PROMPT = """You are an intelligent assistant that generates querie
 I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to one product.
 Your task is to create a natural-sounding customer query that leads to the target product as the answer.
 
-Example:
-Path: ('cooking utensils':category)-[:has_category]-(:product)-[:also_buy]-(target:product)-[:has_color]-('galaxy':color)
-Query: What galaxy-colored product is often bought together with cooking utensils?
-
 Path: {path}
 Query: """
 
 MULTI_TARGET_PROMPT = """You are an intelligent assistant that generates queries about Amazon items.
 I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to multiple target products.
 Your task is to create a natural-sounding customer query that leads to the target products as the answer.
-
-Example:
-Path: ('cooking utensils':category)-[:has_category]-(:product)-[:also_buy]-(target:product)-[:has_color]-('galaxy':color)
-Query: What galaxy-colored products are often bought together with cooking utensils?
 
 Path: {path}
 Query: """
@@ -64,6 +56,7 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
                         "content": prompt,
                     },
                 ],
+                options={"temperature": 0.0},
             )
             writer.writerow(
                 {
