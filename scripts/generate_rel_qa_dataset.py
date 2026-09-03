@@ -11,15 +11,21 @@ TEMPLATES_FILE = "rel_templates.yaml"
 SINGLE_TARGET_PROMPT = """You are an intelligent assistant that generates queries about Amazon items.
 I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to one product.
 Your task is to create a natural-sounding customer query that leads to the target product as the answer.
+Do not shorten product names in a way that could confuse them with similar products.
 
-Path: {path}
+Path:
+{path}
+
 Query: """
 
 MULTI_TARGET_PROMPT = """You are an intelligent assistant that generates queries about Amazon items.
 I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to multiple target products.
 Your task is to create a natural-sounding customer query that leads to the target products as the answer.
+Do not shorten product names in a way that could confuse them with similar products.
 
-Path: {path}
+Path:
+{path}
+
 Query: """
 
 OLLAMA_LLM = "gemma4:26b"
@@ -30,6 +36,7 @@ driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
+row_id = 0
 with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
     writer = csv.DictWriter(outfile, fieldnames=["id", "hops", "query", "answer_ids"])
     writer.writeheader()
@@ -57,15 +64,17 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
                     },
                 ],
                 options={"temperature": 0.0},
-            )
+            )               # TODO: Retry on empty responses or timeouts
             writer.writerow(
                 {
-                    "id": f"r{i+j}",
+                    "id": row_id,
                     "hops": template["hops"],
                     "query": response.message.content,
                     "answer_ids": list(map(int, record["answer_ids"])),
                 }
             )
             print(f"-- Path: {llm_input}\n-- Query: {response.message.content}")
+
+            row_id += 1
 
 print("Fin.")

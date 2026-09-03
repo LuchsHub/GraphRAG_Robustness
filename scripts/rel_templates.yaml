@@ -1,4 +1,34 @@
 templates:
+  - name: "Find products often bought with a given product"
+    hops: 1
+    sampling_cypher: |
+      MATCH (p:product)-[:also_buy]-(target:product)
+      WITH p, count(DISTINCT target) AS answer_count, collect(DISTINCT target.id) AS answer_ids
+      WHERE answer_count >= 1 AND answer_count <= 10
+      RETURN p.name AS pname, answer_count, answer_ids
+      ORDER BY rand()
+      LIMIT 3
+    llm_input: ('{pname}':product)-[:also_buy]-(target:product)
+  - name: "Find products from a given brand"
+    hops: 1
+    sampling_cypher: |
+      MATCH (b:brand)-[:has_brand]-(target:product)
+      WITH b, count(DISTINCT target) AS answer_count, collect(DISTINCT target.id) AS answer_ids
+      WHERE answer_count >= 1 AND answer_count <= 10
+      RETURN b.name AS bname, answer_count, answer_ids
+      ORDER BY rand()
+      LIMIT 3
+    llm_input: ('{bname}':brand)-[:has_brand]-(target:product)
+  - name: "Find colored products that are often bought with a given product"
+    hops: 2
+    sampling_cypher: |
+      MATCH (p:product)-[:also_buy]-(target:product)-[:has_color]-(c:color)
+      WITH p, c, count(DISTINCT target) AS answer_count, collect(DISTINCT target.id) AS answer_ids
+      WHERE answer_count >= 1 AND answer_count <= 10
+      RETURN p.name AS pname, c.name AS cname, answer_count, answer_ids
+      ORDER BY rand()
+      LIMIT 3
+    llm_input: ('{pname}':product)-[:also_buy]-(target:product)-[:has_color]-('{cname}':color)
   - name: "Find product given brand and category"
     hops: 2
     sampling_cypher: |
@@ -19,3 +49,16 @@ templates:
       ORDER BY rand()
       LIMIT 3
     llm_input: ('{caname}':category)-[:has_category]-(:product)-[:also_buy]-(target:product)-[:has_color]-('{coname}':color)
+  - name: "Find products often viewed with products of a given brand and color"
+    hops: 3
+    sampling_cypher: |
+      MATCH (c:category)-[:has_category]-(p:product)-[:has_brand]-(b:brand),
+      (p:product)-[:also_buy]-(target:product)
+      WITH b, c, count(DISTINCT target) AS answer_count, collect(DISTINCT target.id) AS answer_ids
+      WHERE answer_count >= 1 AND answer_count <= 10
+      RETURN b.name AS bname, c.name AS cname, answer_count, answer_ids
+      ORDER BY rand()
+      LIMIT 3
+    llm_input: |
+      ('{cname}':category)-[:has_category]-(p:product)-[:has_brand]-('{bname}':brand),
+      (p:product)-[:also_buy]-(target:product)
