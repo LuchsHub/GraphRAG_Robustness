@@ -2,11 +2,11 @@ import csv
 import time
 from ollama import Client
 
-INPUT_CSV = "../graphs/stark-amazon/products.csv"
-OUTPUT_CSV = "../graphs/stark-amazon/products_with_embeddings.csv"
+INPUT_CSV = "../graphs/stark-amazon/nodes.csv"
+BATCH_SIZE = 32
 MODEL_NAME = "qwen3-embedding:4b"
+OUTPUT_CSV = "../graphs/stark-amazon/nodes_with_embeddings.csv"
 
-BATCH_SIZE = 32  # texts per Ollama request
 
 # Fix: CSV fields can only be 131.072 chars big
 # -> set to 100.000.000 chars
