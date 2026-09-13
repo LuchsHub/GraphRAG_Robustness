@@ -83,6 +83,5 @@ templates:
       RETURN b.name AS bname, c.name AS cname, answer_count, answer_ids, paths
       ORDER BY rand()
       LIMIT 5
-    llm_input: |
-      ('{cname}':category)-[:has_category]-(p:product)-[:has_brand]-('{bname}':brand),
-      (p:product)-[:also_view]-(target:product)
+    llm_input: (p:product)-[:also_view]-(target:product) & ('{cname}':category)-[:has_category]-(p:product)-[:has_brand]-('{bname}':brand)
+      
