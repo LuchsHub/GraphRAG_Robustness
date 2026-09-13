@@ -12,7 +12,6 @@ templates:
       RETURN p.name AS pname, answer_count, answer_ids, paths
       ORDER BY rand()
       LIMIT 5
-    log_format: (p:product)-[:also_buy]-(target:product)
     llm_input: ('{pname}':product)-[:also_buy]-(target:product)
   - id: 1
     name: "Find products from a given brand"
@@ -71,11 +70,11 @@ templates:
       LIMIT 5
     llm_input: ('{caname}':category)-[:has_category]-(:product)-[:also_buy]-(target:product)-[:has_color]-('{coname}':color)
   - id: 5
-    name: "Find products often viewed with products of a given brand and color"
+    name: "Find products often viewed with products of a given brand and category"
     hops: 3
     sampling_cypher: |
       MATCH path = (c:category)-[:has_category]-(p:product)-[:has_brand]-(b:brand),
-          (p:product)-[:also_buy]-(target:product)
+          (p:product)-[:also_view]-(target:product)
       WITH b, c,
           count(DISTINCT target) AS answer_count,
           collect(DISTINCT target.id) AS answer_ids,
@@ -86,4 +85,4 @@ templates:
       LIMIT 5
     llm_input: |
       ('{cname}':category)-[:has_category]-(p:product)-[:has_brand]-('{bname}':brand),
-      (p:product)-[:also_buy]-(target:product)
+      (p:product)-[:also_view]-(target:product)
