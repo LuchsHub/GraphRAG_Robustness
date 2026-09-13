@@ -8,22 +8,11 @@ NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "X"
 TEMPLATES_FILE = "rel_templates.yaml"
 
-SINGLE_TARGET_PROMPT = """You are an intelligent assistant that generates queries about Amazon items.
-I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to one product.
-Your task is to create a natural-sounding customer query that leads to the target product as the answer.
+PROMPT = """You are an intelligent assistant that generates queries about Amazon items.
+I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to {num_answers} product(s).
+Your task is to create a natural-sounding customer query that leads to the target product(s) as the answer.
 Make sure to not confuse the product relations "also_view" and "also_buy" in the query.
-Do not shorten product names in a way that could confuse them with similar products.
-
-Path:
-{path}
-
-Query: """
-
-MULTI_TARGET_PROMPT = """You are an intelligent assistant that generates queries about Amazon items.
-I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to multiple target products.
-Your task is to create a natural-sounding customer query that leads to the target products as the answer.
-Make sure to not confuse the product relations "also_view" and "also_buy" in the query.
-Do not shorten product names in a way that could confuse them with similar products.
+Do not shorten product names in a way that may confuse them with similar products.
 
 Path:
 {path}
@@ -57,16 +46,13 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
             llm_input = template["llm_input"].format(**record)
             print(f"-- Path: {llm_input}")
 
-            if record["answer_count"] == 1:
-                prompt = SINGLE_TARGET_PROMPT.format(path=llm_input)
-            else:
-                prompt = MULTI_TARGET_PROMPT.format(path=llm_input)
+            prompt = PROMPT.format(path=llm_input, num_answers=record["answer_count"])
 
             response = generate(
                 model=OLLAMA_LLM,
                 prompt=prompt,
                 options={"temperature": 0.0, "seed": SEED},
-                think="low",
+                think="high",
             )
 
             triples = []
