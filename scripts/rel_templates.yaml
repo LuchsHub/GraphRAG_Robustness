@@ -3,7 +3,7 @@ templates:
     name: "Find products often bought with a given product"
     hops: 1
     sampling_cypher: |
-      MATCH path = (p:product)-[:also_buy]-(target:product)
+      MATCH path = (p:product)-[:also_buy]->(target:product)
       WITH p, 
           count(DISTINCT target) AS answer_count, 
           collect(DISTINCT target.id) AS answer_ids,
@@ -17,7 +17,7 @@ templates:
     name: "Find products from a given brand"
     hops: 1
     sampling_cypher: |
-      MATCH path = (b:brand)-[:has_brand]-(target:product)
+      MATCH path = (target:product)-[:has_brand]->(b:brand)
       WITH b, 
           count(DISTINCT target) AS answer_count,
           collect(DISTINCT target.id) AS answer_ids,
@@ -26,12 +26,12 @@ templates:
       RETURN b.name AS bname, answer_count, answer_ids, paths
       ORDER BY rand()
       LIMIT 5
-    llm_input: ('{bname}':brand)-[:has_brand]-(target:product)
+    llm_input: (target:product)-[:has_brand]-('{bname}':brand)
   - id: 2
     name: "Find colored products that are often bought with a given product"
     hops: 2
     sampling_cypher: |
-      MATCH path = (p:product)-[:also_buy]-(target:product)-[:has_color]-(c:color)
+      MATCH path = (p:product)<-[:also_buy]-(target:product)-[:has_color]->(c:color)
       WITH p, c,
           count(DISTINCT target) AS answer_count,
           collect(DISTINCT target.id) AS answer_ids,
@@ -45,7 +45,7 @@ templates:
     name: "Find product given brand and category"
     hops: 2
     sampling_cypher: |
-      MATCH path = (b:brand)-[:has_brand]-(target:product)-[:has_category]-(c:category)
+      MATCH path = (b:brand)<-[:has_brand]-(target:product)-[:has_category]->(c:category)
       WITH b, c,
           count(DISTINCT target) AS answer_count,
           collect(DISTINCT target.id) AS answer_ids,
@@ -59,7 +59,7 @@ templates:
     name: "Find colored products often bought with products of a given category"
     hops: 3
     sampling_cypher: |
-      MATCH path = (ca:category)-[:has_category]-(:product)-[:also_buy]-(target:product)-[:has_color]-(co:color)
+      MATCH path = (ca:category)<-[:has_category]-(:product)-[:also_buy]->(target:product)-[:has_color]->(co:color)
       WITH ca, co, 
           count(DISTINCT target) AS answer_count, 
           collect(DISTINCT target.id) AS answer_ids,
@@ -73,12 +73,12 @@ templates:
     name: "Find products often viewed with products of a given brand and category"
     hops: 3
     sampling_cypher: |
-      MATCH path = (c:category)-[:has_category]-(p:product)-[:has_brand]-(b:brand),
-          (p:product)-[:also_view]-(target:product)
+      MATCH path1 = (c:category)<-[:has_category]-(p:product)-[:has_brand]->(b:brand),
+            path2 = (p:product)-[:also_view]->(target:product)
       WITH b, c,
           count(DISTINCT target) AS answer_count,
           collect(DISTINCT target.id) AS answer_ids,
-          collect(path) AS paths
+          collect(path1) + collect(path2) AS paths
       WHERE answer_count <= 10
       RETURN b.name AS bname, c.name AS cname, answer_count, answer_ids, paths
       ORDER BY rand()
