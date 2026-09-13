@@ -31,6 +31,7 @@ Path:
 Query: """
 
 OLLAMA_LLM = "gemma4:26b"
+SEED = 7
 OUTPUT_FILE = "../qa_datasets/rel_amazon.csv"
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
@@ -64,15 +65,15 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
             response = generate(
                 model=OLLAMA_LLM,
                 prompt=prompt,
-                options={"temperature": 0.0, "seed": 7},
+                options={"temperature": 0.0, "seed": SEED},
                 think="low",
             )
 
             triples = []
             for path in record["paths"]:
                 for rel in path.relationships:
-                    h = rel.start_node.get("id")
-                    t = rel.end_node.get("id")
+                    h = int(rel.start_node.get("id"))
+                    t = int(rel.end_node.get("id"))
                     r = rel.type
 
                     if (h, r, t) not in triples and (t, r, h) not in triples:
