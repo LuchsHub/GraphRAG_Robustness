@@ -30,7 +30,9 @@ with open(input_file, "r", encoding="utf-8") as infile:
         rel = row[1]
         dst_id = row[2]
 
-        sorted_triple = (src_id, rel, dst_id) if src_id < dst_id else (dst_id, rel, src_id)
+        sorted_triple = (
+            (src_id, rel, dst_id) if src_id < dst_id else (dst_id, rel, src_id)
+        )
 
         if sorted_triple not in dedup_triples:
             dedup_triples.add(sorted_triple)
@@ -39,7 +41,7 @@ total_triples = len(dedup_triples)
 num_to_keep = int(total_triples * (1.0 - DROP_RATIO))
 print(total_triples)
 
-# Sampple random triples
+# Sample random triples
 dedup_triples = list(dedup_triples)
 keep_triples = random.sample(dedup_triples, num_to_keep)
 print(len(keep_triples))
