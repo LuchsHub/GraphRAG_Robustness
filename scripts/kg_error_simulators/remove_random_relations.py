@@ -2,7 +2,9 @@ import csv
 import os
 import random
 
-BASE_GRAPH = "../graphs/stark-amazon"
+from utils import get_deduplicated_triples_from_csv
+
+BASE_GRAPH = "../../graphs/stark-amazon"
 DROP_RATIO = 0.50
 SEED = 7
 
@@ -19,23 +21,7 @@ input_file = os.path.join(BASE_GRAPH, "triples.csv")
 output_file = os.path.join(output_dir, "triples.csv")
 
 # Deduplicate bidirectional triples
-dedup_triples = set()
-
-with open(input_file, "r", encoding="utf-8") as infile:
-    reader = csv.reader(infile)
-    header = next(reader)
-
-    for row in reader:
-        src_id = row[0]
-        rel = row[1]
-        dst_id = row[2]
-
-        sorted_triple = (
-            (src_id, rel, dst_id) if src_id < dst_id else (dst_id, rel, src_id)
-        )
-
-        if sorted_triple not in dedup_triples:
-            dedup_triples.add(sorted_triple)
+header, dedup_triples = get_deduplicated_triples_from_csv(input_file)
 
 total_triples = len(dedup_triples)
 num_to_keep = int(total_triples * (1.0 - DROP_RATIO))
@@ -46,7 +32,7 @@ dedup_triples = list(dedup_triples)
 keep_triples = random.sample(dedup_triples, num_to_keep)
 print(len(keep_triples))
 
-# 4. Write to output
+# Write to output
 with open(output_file, "w", newline="", encoding="utf-8") as outfile:
     writer = csv.writer(outfile)
     writer.writerow(header)
