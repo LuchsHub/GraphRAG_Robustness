@@ -15,7 +15,7 @@ i = 0
 while os.path.exists(f"{BASE_GRAPH}-rel-incomp-{i}"):
     i += 1
 output_dir = f"{BASE_GRAPH}-rel-incomp-{i}"
-os.makedirs(output_dir, exist_ok=True)
+os.makedirs(output_dir)
 
 input_file = os.path.join(BASE_GRAPH, "triples.csv")
 output_file = os.path.join(output_dir, "triples.csv")
