@@ -2,12 +2,14 @@ from neo4j import GraphDatabase
 from ollama import generate
 import yaml
 import csv
+import random
 
+SEED = 7
 NEO4J_URI = "bolt://localhost:17687"
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "X"
 TEMPLATES_FILE = "rel_templates.yaml"
-
+QUERIES_PER_TEMPLATE = 1
 PROMPT = """You are an intelligent assistant that generates queries about Amazon items.
 I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to {num_answers} product(s).
 Your task is to create a natural-sounding customer query that leads to the target product(s) as the answer.
@@ -18,11 +20,10 @@ Path:
 {path}
 
 Query: """
-
 OLLAMA_LLM = "gemma4:26b"
-SEED = 7
 OUTPUT_FILE = "../qa_datasets/rel_amazon.csv"
 
+random.seed(SEED)
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
@@ -36,17 +37,26 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
     writer.writeheader()
 
     for template in config["templates"]:
-        print(f"({template['id']}) {template['name']}")
+        print(template["id"], template["name"])
 
-        records, _, _ = driver.execute_query(template["sampling_cypher"])
-        num_records = len(records)
+        # get random assignments for current template
+        records, _, _ = driver.execute_query(template["find_assignments_cypher"])
+        sampled_assignments = random.sample(records, QUERIES_PER_TEMPLATE)
 
-        for i, record in enumerate(records):
-            print(f"- {i + 1}/{num_records}")
-            llm_input = template["llm_input"].format(**record)
-            print(f"-- Path: {llm_input}")
+        for assignment in sampled_assignments:
+            # instantiate assignment: get initial entity names, golden triples, answer count, answer ids
+            records, _, _ = driver.execute_query(
+                template["instantiate_assignment_cypher"], **assignment
+            )
+            instantiated_assignment = records[0]
+            print(instantiated_assignment)
 
-            prompt = PROMPT.format(path=llm_input, num_answers=record["answer_count"])
+            llm_input = template["llm_input"].format(**instantiated_assignment)
+            print(llm_input)
+
+            prompt = PROMPT.format(
+                path=llm_input, num_answers=instantiated_assignment["answer_count"]
+            )
 
             response = generate(
                 model=OLLAMA_LLM,
@@ -55,26 +65,16 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
                 think="high",
             )
 
-            triples = []
-            for path in record["paths"]:
-                for rel in path.relationships:
-                    h = int(rel.start_node.get("id"))
-                    t = int(rel.end_node.get("id"))
-                    r = rel.type
-
-                    if (h, r, t) not in triples and (t, r, h) not in triples:
-                        triples.append((h, r, t))
-
             writer.writerow(
                 {
                     "id": row_id,
                     "template_id": template["id"],
                     "query": response.response,
-                    "answer_ids": list(map(int, record["answer_ids"])),
-                    "triples": triples,
+                    "answer_ids": instantiated_assignment["answer_ids"],
+                    "triples": instantiated_assignment["triples"],
                 }
             )
-            print(f"-- Query: {response.response}")
+            print(response.response)
 
             row_id += 1
 
