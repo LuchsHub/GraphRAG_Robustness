@@ -5,7 +5,6 @@ from ollama import Client
 INPUT_CSV = "../graphs/stark-amazon/nodes.csv"
 BATCH_SIZE = 32
 MODEL_NAME = "qwen3-embedding:4b"
-SEED = 7
 OUTPUT_CSV = "../graphs/stark-amazon/nodes_with_embeddings.csv"
 
 
@@ -21,7 +20,7 @@ def process_batch(client: Client, batch: list[dict]) -> list[dict]:
     response = client.embed(
         model=MODEL_NAME,
         input=texts,
-        options={"temperature": 0.0, "seed": SEED},
+        options={"temperature": 0.0},
     )
     embeddings = response["embeddings"]
 

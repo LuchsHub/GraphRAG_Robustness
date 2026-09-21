@@ -61,7 +61,7 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
             response = generate(
                 model=OLLAMA_LLM,
                 prompt=prompt,
-                options={"temperature": 0.0, "seed": SEED},
+                options={"temperature": 0.0},
                 think="high",
             )
 
