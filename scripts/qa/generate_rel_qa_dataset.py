@@ -1,33 +1,32 @@
-from neo4j import GraphDatabase
-from ollama import generate
 import yaml
 import csv
 import random
 
-SEED = 7
-NEO4J_URI = "bolt://localhost:17687"
-NEO4J_USER = "neo4j"
-NEO4J_PASSWORD = "X"
-TEMPLATES_FILE = "rel_templates.yaml"
-QUERIES_PER_TEMPLATE = 1
-PROMPT = """You are an intelligent assistant that generates queries about Amazon items.
-I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to {num_answers} product(s).
-Your task is to create a natural-sounding customer query that leads to the target product(s) as the answer.
-Make sure to not confuse the product relations "also_view" and "also_buy" in the query.
-Do not shorten product names in a way that may confuse them with similar products.
+from neo4j import GraphDatabase
+from ollama import generate
 
-Path:
-{path}
+TEMPLATES_FILE = "../../configs/rel_templates.yaml"
+CONFIG_FILE = "../../configs/config.yaml"
+OUTPUT_FILE = "../../qa_datasets/rel_amazon.csv"
 
-Query: """
-OLLAMA_LLM = "gemma4:26b"
-OUTPUT_FILE = "../qa_datasets/rel_amazon.csv"
+with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
+    templates = yaml.safe_load(f)
+with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f)
+
+SEED = config["models"]["seed"]
+NEO4J_URI = config["neo4j"]["uri"]
+NEO4J_USER = config["neo4j"]["user"]
+NEO4J_PASSWORD = config["neo4j"]["password"]
+QUERIES_PER_TEMPLATE = config["relational_qa_dataset_generation"][
+    "queries_per_template"
+]
+PROMPT = config["relational_qa_dataset_generation"]["prompt"]
+MODEL = config["models"]["qa_dataset_generation_model"]
+
 
 random.seed(SEED)
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-
-with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
-    config = yaml.safe_load(f)
 
 row_id = 0
 with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
@@ -36,7 +35,7 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
     )
     writer.writeheader()
 
-    for template in config["templates"]:
+    for template in templates["templates"]:
         print(template["id"], template["name"])
 
         # get random assignments for current template
@@ -59,9 +58,9 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
             )
 
             response = generate(
-                model=OLLAMA_LLM,
+                model=MODEL,
                 prompt=prompt,
-                options={"temperature": 0.0},
+                options={"temperature": 0.0, "seed": SEED},
                 think="high",
             )
 

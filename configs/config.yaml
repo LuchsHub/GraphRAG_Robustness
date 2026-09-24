@@ -1,6 +1,29 @@
 models: 
-  embedding_model: "qwen3-embedding:4b"
+  embedding_model: "qwen3-embedding:4b"       
   embed_batch_size: 32
+  qa_dataset_generation_model: "gemma4:26b" # LLM used in QA dataset generation scripts
+
+  # options to ensure reproducible outputs on every call
   seed: 7
+  temperature: 0.0
+
+neo4j: 
+  uri: "bolt://localhost:17687"
+  user: "neo4j"
+  password: "X"
+
+relational_qa_dataset_generation:
+  queries_per_template: 1
+  prompt: |
+    You are an intelligent assistant that generates queries about Amazon items.
+    I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to {num_answers} product(s).
+    Your task is to create a natural-sounding customer query that leads to the target product(s) as the answer.
+    Make sure to not confuse the product relations "also_view" and "also_buy" in the query.
+    Do not shorten product names in a way that may confuse them with similar products.
+
+    Path:
+    {path}
+
+    Query: 
 
 graph_entity_count: 1035542
