@@ -8,8 +8,10 @@ from stark_qa import load_skb
 from neo4j import GraphDatabase
 from ollama import generate
 
+
 class QueryAmbiguityCheck(BaseModel):
     decision: Literal["KEEP", "DISCARD"]
+
 
 CONFIG_FILE = "../../configs/config.yaml"
 OUTPUT_FILE = "../../qa_datasets/text_amazon.csv"
@@ -26,7 +28,9 @@ QUERY_GEN_PROMPT = config["textual_qa_dataset_generation"]["query_gen_prompt"]
 MODEL = config["models"]["qa_dataset_generation_model"]
 TEMPERATURE = config["models"]["temperature"]
 SIMILAR_NODES_CYPHER = config["textual_qa_dataset_generation"]["similar_nodes_cypher"]
-AMBIGUITY_CHECK_PROMPT = config["textual_qa_dataset_generation"]["ambiguity_check_prompt"]
+AMBIGUITY_CHECK_PROMPT = config["textual_qa_dataset_generation"][
+    "ambiguity_check_prompt"
+]
 
 skb = load_skb("amazon", download_processed=True)
 random.seed(SEED)
