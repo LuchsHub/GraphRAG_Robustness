@@ -19,21 +19,24 @@ OUTPUT_FILE = "../../qa_datasets/text_amazon.csv"
 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-SEED = config["models"]["seed"]
+LLM_SEED = config["models"]["seed"]
+SELECTION_SEED = config["qa_dataset_generation"]["seed"]
 NEO4J_URI = config["neo4j"]["uri"]
 NEO4J_USER = config["neo4j"]["user"]
 NEO4J_PASSWORD = config["neo4j"]["password"]
-NUM_QUERIES = config["textual_qa_dataset_generation"]["num_queries"]
-QUERY_GEN_PROMPT = config["textual_qa_dataset_generation"]["query_gen_prompt"]
+NUM_QUERIES = config["qa_dataset_generation"]["textual"]["num_queries"]
+QUERY_GEN_PROMPT = config["qa_dataset_generation"]["textual"]["query_gen_prompt"]
 MODEL = config["models"]["qa_dataset_generation_model"]
 TEMPERATURE = config["models"]["temperature"]
-SIMILAR_NODES_CYPHER = config["textual_qa_dataset_generation"]["similar_nodes_cypher"]
-AMBIGUITY_CHECK_PROMPT = config["textual_qa_dataset_generation"][
+SIMILAR_NODES_CYPHER = config["qa_dataset_generation"]["textual"][
+    "similar_nodes_cypher"
+]
+AMBIGUITY_CHECK_PROMPT = config["qa_dataset_generation"]["textual"][
     "ambiguity_check_prompt"
 ]
 
 skb = load_skb("amazon", download_processed=True)
-random.seed(SEED)
+random.seed(SELECTION_SEED)
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
@@ -51,7 +54,7 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
         response = generate(
             model=MODEL,
             prompt=query_gen_prompt,
-            options={"seed": SEED, "temperature": TEMPERATURE},
+            options={"seed": LLM_SEED, "temperature": TEMPERATURE},
             think="high",
         )
         generated_query = response.response
@@ -72,7 +75,7 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
         response = generate(
             model=MODEL,
             prompt=query_ambiguity_prompt,
-            options={"temperature": TEMPERATURE, "seed": SEED},
+            options={"temperature": TEMPERATURE, "seed": LLM_SEED},
             think="high",
             format=QueryAmbiguityCheck.model_json_schema(),
         )

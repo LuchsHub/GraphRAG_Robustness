@@ -15,7 +15,7 @@ with open(CONFIG_FILE, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 LLM_SEED = config["models"]["seed"]
-SELECTION_SEED = config["qa_dataset_generation"]["relational"]["seed"]
+SELECTION_SEED = config["qa_dataset_generation"]["seed"]
 NEO4J_URI = config["neo4j"]["uri"]
 NEO4J_USER = config["neo4j"]["user"]
 NEO4J_PASSWORD = config["neo4j"]["password"]
