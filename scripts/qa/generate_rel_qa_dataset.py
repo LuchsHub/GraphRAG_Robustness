@@ -23,6 +23,7 @@ QUERIES_PER_TEMPLATE = config["relational_qa_dataset_generation"][
 ]
 PROMPT = config["relational_qa_dataset_generation"]["prompt"]
 MODEL = config["models"]["qa_dataset_generation_model"]
+TEMPERATURE = config["models"]["temperature"]
 
 
 random.seed(SEED)
@@ -60,7 +61,7 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
             response = generate(
                 model=MODEL,
                 prompt=prompt,
-                options={"temperature": 0.0, "seed": SEED},
+                options={"temperature": TEMPERATURE, "seed": SEED},
                 think="high",
             )
 

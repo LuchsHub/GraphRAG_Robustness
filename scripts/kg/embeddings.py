@@ -12,6 +12,7 @@ with open(CONFIG_FILE, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 EMBEDDING_MODEL = config["models"]["embedding_model"]
+TEMPERATURE = config["models"]["temperature"]
 SEED = config["models"]["seed"]
 BATCH_SIZE = config["models"]["embed_batch_size"]
 ROW_COUNT = config["graph_entity_count"]
@@ -28,7 +29,7 @@ def process_batch(client: Client, batch: list[dict]) -> list[dict]:
     response = client.embed(
         model=EMBEDDING_MODEL,
         input=texts,
-        options={"temperature": 0.0, "seed": SEED},
+        options={"temperature": TEMPERATURE, "seed": SEED},
     )
     embeddings = response["embeddings"]
 
