@@ -4,9 +4,9 @@ import yaml
 
 from ollama import Client
 
-CONFIG_FILE = "../configs/config.yaml"
-INPUT_CSV = "../graphs/stark-amazon/nodes.csv"
-OUTPUT_CSV = "../graphs/stark-amazon/nodes_with_embeddings.csv"
+CONFIG_FILE = "../../configs/config.yaml"
+INPUT_CSV = "../../graphs/stark-amazon/nodes.csv"
+OUTPUT_CSV = "../../graphs/stark-amazon/nodes_with_embeddings.csv"
 
 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)

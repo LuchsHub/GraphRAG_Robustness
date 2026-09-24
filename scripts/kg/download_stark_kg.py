@@ -1,7 +1,7 @@
 from stark_qa import load_skb
 import csv
 
-OUTPUT_DIR = "../graphs/stark-amazon"
+OUTPUT_DIR = "..././graphs/stark-amazon"
 
 skb = load_skb("amazon", download_processed=True)
 
