@@ -15,7 +15,7 @@ EMBEDDING_MODEL = config["models"]["embedding_model"]
 TEMPERATURE = config["models"]["temperature"]
 SEED = config["models"]["seed"]
 BATCH_SIZE = config["models"]["embed_batch_size"]
-ROW_COUNT = config["graph_entity_count"]
+ROW_COUNT = config["graph"]["entity_count"]
 
 # Fix: CSV fields can only be 131.072 chars big
 # -> set to 100.000.000 chars
