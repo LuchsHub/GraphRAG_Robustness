@@ -22,54 +22,65 @@ neo4j:
   user: "neo4j"
   password: "X"
 
-relational_qa_dataset_generation:
-  queries_per_template: 1
-  prompt: |-
-    You are an intelligent assistant that generates queries about Amazon items.
-    I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to {num_answers} product(s).
-    Your task is to create a natural-sounding customer query that leads to the target product(s) as the answer.
-    Make sure to not confuse the product relations "also_view" and "also_buy" in the query.
-    Do not shorten product names in a way that may confuse them with similar products.
+qa_dataset_generation:
+  seed: 7
+  relational:
+    queries_per_template: 1
+    prompt: |-
+      You are an intelligent assistant that generates queries about Amazon items.
+      I will provide you with a golden path from an Amazon product recommendation knowledge graph which leads to {num_answers} product(s).
+      Your task is to create a natural-sounding customer query that leads to the target product(s) as the answer.
+      Make sure to not confuse the product relations "also_view" and "also_buy" in the query.
+      Do not shorten product names in a way that may confuse them with similar products.
 
-    Path:
-    {path}
+      Path:
+      {path}
 
-    Query: 
+      Query: 
+  textual:
+    num_queries: 5
+    query_gen_prompt: |-
+      You are an intelligent assistant that generates queries about Amazon items.
+      I will provide you with a textual document associated with a product entity in a Amazon product recommendation knowledge graph.
+      Your task is to create a natural-sounding customer query that leads to this entity as the answer.
+      Try to use many different aspects of the document in your query, such as features, reviews or specifications.
+      Do not use the product name directly in your query.
 
-textual_qa_dataset_generation:
-  num_queries: 5
-  query_gen_prompt: |-
-    You are an intelligent assistant that generates queries about Amazon items.
-    I will provide you with a textual document associated with a product entity in a Amazon product recommendation knowledge graph.
-    Your task is to create a natural-sounding customer query that leads to this entity as the answer.
-    Try to use many different aspects of the document in your query, such as features, reviews or specifications.
-    Do not use the product name directly in your query.
+      Document:
+      {doc}
 
-    Document:
-    {doc}
+      Query: 
+    similar_nodes_cypher: |-
+      MATCH (p1:product {{id: '{id}'}})
+      MATCH (p2:product)
+        SEARCH p2 IN (
+          VECTOR INDEX product_index
+          FOR p1.embedding
+          LIMIT 5
+        )
+      WHERE p1.id <> p2.id
+      RETURN p2.document AS document
+    ambiguity_check_prompt: |-
+      You are an intelligent assistant that checks if a query is ambiguous.
+      I will provide you with a list of documents, each describing a different product.
+      Document #0 is the document the query was generated with.
+      The other documents are semantically similar documents.
 
-    Query: 
-  similar_nodes_cypher: |-
-    MATCH (p1:product {{id: '{id}'}})
-    MATCH (p2:product)
-      SEARCH p2 IN (
-        VECTOR INDEX product_index
-        FOR p1.embedding
-        LIMIT 5
-      )
-    WHERE p1.id <> p2.id
-    RETURN p2.document AS document
-  ambiguity_check_prompt: |-
-    You are an intelligent assistant that checks if a query is ambiguous.
-    I will provide you with a list of documents, each describing a different product.
-    Document #0 is the document the query was generated with.
-    The other documents are semantically similar documents.
+      Please decide:
+      - "KEEP" if the query is specific enough to only lead to document #0 as the answer.
+      - "DISCARD" if the query could be understood to lead to one of the other documents as well. 
 
-    Please decide:
-    - "KEEP" if the query is specific enough to only lead to document #0 as the answer.
-    - "DISCARD" if the query could be understood to lead to one of the other documents as well. 
+      Query: {query}
 
-    Query: {query}
+      Documents:
+      {documents}
 
-    Documents:
-    {documents}
+error_simulation:
+  seed: 7
+  add_random_relations_simulator:
+    add_edge_ratio: 0.5 # number of edges added = #edges * add_edge_ratio
+    added_relations:
+      - related to
+      - associated with
+      - connected to
+      - linked with

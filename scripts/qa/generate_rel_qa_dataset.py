@@ -14,19 +14,20 @@ with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-SEED = config["models"]["seed"]
+LLM_SEED = config["models"]["seed"]
+SELECTION_SEED = config["qa_dataset_generation"]["relational"]["seed"]
 NEO4J_URI = config["neo4j"]["uri"]
 NEO4J_USER = config["neo4j"]["user"]
 NEO4J_PASSWORD = config["neo4j"]["password"]
-QUERIES_PER_TEMPLATE = config["relational_qa_dataset_generation"][
+QUERIES_PER_TEMPLATE = config["qa_dataset_generation"]["relational"][
     "queries_per_template"
 ]
-PROMPT = config["relational_qa_dataset_generation"]["prompt"]
+PROMPT = config["qa_dataset_generation"]["relational"]["prompt"]
 MODEL = config["models"]["qa_dataset_generation_model"]
 TEMPERATURE = config["models"]["temperature"]
 
 
-random.seed(SEED)
+random.seed(SELECTION_SEED)
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 row_id = 0
@@ -61,7 +62,7 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
             response = generate(
                 model=MODEL,
                 prompt=prompt,
-                options={"temperature": TEMPERATURE, "seed": SEED},
+                options={"temperature": TEMPERATURE, "seed": LLM_SEED},
                 think="high",
             )
 
