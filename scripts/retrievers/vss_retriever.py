@@ -1,15 +1,13 @@
-from neo4j import Driver, GraphDatabase
-from neo4j_graphrag.embeddings.ollama import OllamaEmbeddings
-from neo4j_graphrag.retrievers import VectorRetriever
-
 import time
 import ast
 
+from neo4j import Driver
+from neo4j_graphrag.embeddings.ollama import OllamaEmbeddings
+from neo4j_graphrag.retrievers import VectorRetriever
+
 
 class VSSRetriever:
-    def __init__(
-        self, driver: Driver, index_name: str, ollama_model="qwen3-embedding:4b"
-    ) -> None:
+    def __init__(self, driver: Driver, index_name: str, ollama_model: str) -> None:
         self.ollama_embedder = OllamaEmbeddings(model=ollama_model)
         self.retriever = VectorRetriever(
             driver=driver,
@@ -17,14 +15,16 @@ class VSSRetriever:
             return_properties=["id"],
         )
 
-    def retrieve(self, query: str, top_k: int = 5) -> tuple[list, dict]:
+    def retrieve(
+        self, query: str, temperature: float, seed: int, top_k: int
+    ) -> tuple[list, dict]:
         answer_ids = []
         log_dict = {}
 
         start_time = time.time()
         query_vector = self.ollama_embedder.embed_query(
             query,
-            options={"temperature": 0.0},
+            options={"temperature": temperature, "seed": seed},
         )
         search_results = self.retriever.search(
             query_vector=query_vector,
