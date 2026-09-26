@@ -1,3 +1,4 @@
+import yaml
 import csv
 import os
 import random
@@ -7,13 +8,20 @@ import time
 from stark_qa import load_skb
 from ollama import embed
 
-DATASET_NAME = "amazon"
-SEED = 7
+CONFIG_FILE = "../../configs/config.yaml"
 BASE_GRAPH = "../../graphs/stark-amazon"
-NUM_GRAPHS = 3
-ENTITIES_COUNT = 1035542
-NOISE_PROBABILITY = 0.30
-MODEL_NAME = "qwen3-embedding:4b"
+
+with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f)
+
+SELECTION_SEEDS = config["error_simulation"]["seeds"]
+ENTITIES_COUNT = config["graph"]["entity_count"]
+ADD_TEXT_PROBABILITY = config["error_simulation"]["add_random_texts"][
+    "add_text_probability"
+]
+MODEL_NAME = config["models"]["embedding_model"]
+LLM_SEED = config["models"]["seed"]
+TEMPERATURE = config["models"]["temperature"]
 
 
 def add_random_chunks(
@@ -32,24 +40,19 @@ def add_random_chunks(
 csv.field_size_limit(100000000)
 
 # get all product IDs
-skb = load_skb(DATASET_NAME, download_processed=True)
+skb = load_skb("amazon", download_processed=True)
 product_ids = skb.get_node_ids_by_type("product")
 
 input_file = os.path.join(BASE_GRAPH, "nodes_with_embeddings.csv")
 
-# find new output dir names and create
 output_files = []
-dir_index = 0
-for _ in range(NUM_GRAPHS):
-    while os.path.exists(f"{BASE_GRAPH}-text-add-{dir_index}"):
-        dir_index += 1
-    output_dir = f"{BASE_GRAPH}-text-add-{dir_index}"
+rngs = []
+for seed in SELECTION_SEEDS[:3]:
+    output_dir = f"{BASE_GRAPH}-text-add-{seed}"
     os.makedirs(output_dir)
     output_files.append(os.path.join(output_dir, "nodes_with_embeddings.csv"))
-    dir_index += 1
+    rngs.append(random.Random(seed))
 
-# open NUM_GRAPHS output files
-# with statement needs to be changed along the NUM_GRAPHS constant, I have not found a simpler way to do this yet
 with open(input_file, "r", encoding="utf-8", newline="") as infile, open(
     output_files[0], "w", encoding="utf-8", newline=""
 ) as out0, open(output_files[1], "w", encoding="utf-8", newline="") as out1, open(
@@ -61,10 +64,7 @@ with open(input_file, "r", encoding="utf-8", newline="") as infile, open(
     for writer in writers:
         writer.writeheader()
 
-    # initialize three seed instances
-    rngs = [random.Random(SEED + i) for i in range(NUM_GRAPHS)]
     start_time = time.time()
-
     for i, row in enumerate(reader, 1):
         if i % 1000 == 0:
             elapsed_time = time.time() - start_time
@@ -74,7 +74,7 @@ with open(input_file, "r", encoding="utf-8", newline="") as infile, open(
 
         if row[":LABEL"].startswith("product"):
             # Which output files should get a noisy row?
-            noises = [rng.random() < NOISE_PROBABILITY for rng in rngs]
+            noises = [rng.random() < ADD_TEXT_PROBABILITY for rng in rngs]
 
             # iterate through RNG results
             for j, noise in enumerate(noises):
@@ -99,7 +99,7 @@ with open(input_file, "r", encoding="utf-8", newline="") as infile, open(
                     response = embed(
                         model=MODEL_NAME,
                         input=[noisy_doc],
-                        options={"temperature": 0.0},
+                        options={"temperature": TEMPERATURE, "seed": LLM_SEED},
                     )
                     embeddings = response["embeddings"]
 

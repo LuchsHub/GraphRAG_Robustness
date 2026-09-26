@@ -1,33 +1,35 @@
+import yaml
 import csv
 import os
 import random
 import time
 from ollama import embed
 
-SEED = 7
+CONFIG_FILE = "../../configs/config.yaml"
 BASE_GRAPH = "../../graphs/stark-amazon"
-NUM_GRAPHS = 3
-ENTITIES_COUNT = 1035542
-DROP_RATIO = 0.30
-MODEL_NAME = "qwen3-embedding:4b"
+
+with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f)
+
+SELECTION_SEEDS = config["error_simulation"]["seeds"]
+ENTITIES_COUNT = config["graph"]["entity_count"]
+DROP_PROBABILITY = config["error_simulation"]["remove_random_texts"]["drop_probability"]
+MODEL_NAME = config["models"]["embedding_model"]
+LLM_SEED = config["models"]["seed"]
+TEMPERATURE = config["models"]["temperature"]
 
 csv.field_size_limit(100000000)
 
 input_file = os.path.join(BASE_GRAPH, "nodes_with_embeddings.csv")
 
-# Find new output dir names and create
 output_files = []
-dir_index = 0
-for _ in range(NUM_GRAPHS):
-    while os.path.exists(f"{BASE_GRAPH}-text-incomp-{dir_index}"):
-        dir_index += 1
-    output_dir = f"{BASE_GRAPH}-text-incomp-{dir_index}"
+rngs = []
+for seed in SELECTION_SEEDS[:3]:
+    output_dir = f"{BASE_GRAPH}-text-incomp-{seed}"
     os.makedirs(output_dir)
     output_files.append(os.path.join(output_dir, "nodes_with_embeddings.csv"))
-    dir_index += 1
+    rngs.append(random.Random(seed))
 
-# open NUM_GRAPHS output files
-# with statement needs to be changed along the NUM_GRAPHS constant, I have not found a simpler way to do this yet
 with open(input_file, "r", encoding="utf-8", newline="") as infile, open(
     output_files[0], "w", encoding="utf-8", newline=""
 ) as out0, open(output_files[1], "w", encoding="utf-8", newline="") as out1, open(
@@ -39,10 +41,7 @@ with open(input_file, "r", encoding="utf-8", newline="") as infile, open(
     for writer in writers:
         writer.writeheader()
 
-    # initialize three seed instances
-    rngs = [random.Random(SEED + i) for i in range(NUM_GRAPHS)]
     start_time = time.time()
-
     for i, row in enumerate(reader, 1):
         if i % 1000 == 0:
             elapsed_time = time.time() - start_time
@@ -53,14 +52,14 @@ with open(input_file, "r", encoding="utf-8", newline="") as infile, open(
         # only remove text for products
         if row[":LABEL"].startswith("product"):
             # drop chance per seed
-            drops = [rng.random() < DROP_RATIO for rng in rngs]
+            drops = [rng.random() < DROP_PROBABILITY for rng in rngs]
 
             # generate embedding for "name" if any seed hit
             if any(drops):
                 response = embed(
                     model=MODEL_NAME,
                     input=row["name"],
-                    options={"temperature": 0.0},
+                    options={"temperature": TEMPERATURE, "seed": LLM_SEED},
                 )
                 embeddings = response["embeddings"]
 
