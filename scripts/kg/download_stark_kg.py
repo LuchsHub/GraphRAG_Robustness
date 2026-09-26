@@ -17,8 +17,8 @@ edge_names = [skb.edge_type_dict[e] for e in edge_types]
 # Create triples as (node 1 ID, edge, node 2 ID)
 triples = zip(src_ids, edge_names, dst_ids)
 
-csv_path = f"{OUTPUT_DIR}/triples.csv"
-with open(csv_path, "w", newline="", encoding="utf-8") as f:
+triples_path = f"{OUTPUT_DIR}/triples.csv"
+with open(triples_path, "w", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
     writer.writerow([":START_ID", ":TYPE", ":END_ID"])
     writer.writerows(triples)
@@ -44,8 +44,8 @@ for n_id in range(skb.num_nodes()):
     )
     nodes.append(node)
 
-products_csv_path = f"{OUTPUT_DIR}/nodes.csv"
-with open(products_csv_path, "w", newline="", encoding="utf-8") as f:
+nodes_path = f"{OUTPUT_DIR}/nodes.csv"
+with open(nodes_path, "w", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
     writer.writerow(["id:ID", "name", "document", ":LABEL"])
     writer.writerows(nodes)
