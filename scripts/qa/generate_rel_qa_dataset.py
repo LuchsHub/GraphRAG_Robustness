@@ -1,9 +1,10 @@
 import yaml
 import csv
 import random
+import time
 
 from neo4j import GraphDatabase
-from ollama import generate
+import ollama
 
 TEMPLATES_FILE = "../../configs/rel_templates.yaml"
 CONFIG_FILE = "../../configs/config.yaml"
@@ -29,6 +30,7 @@ TEMPERATURE = config["models"]["temperature"]
 
 random.seed(SELECTION_SEED)
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+client = ollama.Client(timeout=60.0)
 
 row_id = 0
 with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
@@ -37,34 +39,45 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
     )
     writer.writeheader()
 
+    failed_generations = []
     for template in templates["templates"]:
         print(template["id"], template["name"])
 
         # get random assignments for current template
         records, _, _ = driver.execute_query(template["find_assignments_cypher"])
-        sampled_assignments = random.sample(records, QUERIES_PER_TEMPLATE)
+        if len(records) <= QUERIES_PER_TEMPLATE:
+            print(f"Not enough assignments. Using all {len(records)}.")
+            assignments = records
+        else:
+            assignments = random.sample(records, QUERIES_PER_TEMPLATE)
 
-        for assignment in sampled_assignments:
+        for assignment in assignments:
+            print(row_id)
+
             # instantiate assignment: get initial entity names, golden triples, answer count, answer ids
             records, _, _ = driver.execute_query(
                 template["instantiate_assignment_cypher"], **assignment
             )
             instantiated_assignment = records[0]
-            print(instantiated_assignment)
 
             llm_input = template["llm_input"].format(**instantiated_assignment)
-            print(llm_input)
 
             prompt = PROMPT.format(
                 path=llm_input, num_answers=instantiated_assignment["answer_count"]
             )
 
-            response = generate(
-                model=MODEL,
-                prompt=prompt,
-                options={"temperature": TEMPERATURE, "seed": LLM_SEED},
-                think="high",
-            )
+            try:
+                response = client.generate(
+                    model=MODEL,
+                    prompt=prompt,
+                    options={"temperature": TEMPERATURE, "seed": LLM_SEED},
+                    think="high",
+                )
+            except Exception as e:
+                print(e)
+                failed_generations.append((template["id"], instantiated_assignment))
+                time.sleep(5)
+                continue
 
             writer.writerow(
                 {
@@ -75,8 +88,8 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
                     "triples": instantiated_assignment["triples"],
                 }
             )
-            print(response.response)
 
             row_id += 1
 
 print("Fin.")
+print(f"Failed: {failed_generations}")
