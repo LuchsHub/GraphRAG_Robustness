@@ -1,32 +1,28 @@
-import time
 import ast
+import time
 
-from neo4j import Driver
-from neo4j_graphrag.embeddings.ollama import OllamaEmbeddings
+from neo4j import GraphDatabase
 from neo4j_graphrag.retrievers import VectorRetriever
 
+from .base import Retriever
 
-class VSSRetriever:
-    def __init__(self, driver: Driver, index_name: str, ollama_model: str) -> None:
-        self.ollama_embedder = OllamaEmbeddings(model=ollama_model)
-        self.retriever = VectorRetriever(
-            driver=driver,
-            index_name=index_name,
-            return_properties=["id"],
-        )
 
-    def retrieve(
-        self, query: str, temperature: float, seed: int, top_k: int
-    ) -> tuple[list, dict]:
+class VSSRetriever(Retriever):
+    def retrieve(self, query: str, top_k: int) -> tuple[list, dict]:
         answer_ids = []
         log_dict = {}
 
         start_time = time.time()
         query_vector = self.ollama_embedder.embed_query(
             query,
-            options={"temperature": temperature, "seed": seed},
+            options={"temperature": self.temp, "seed": self.seed},
         )
-        search_results = self.retriever.search(
+        retriever = VectorRetriever(
+            driver=self.driver,
+            index_name="product_index",
+            return_properties=["id"],
+        )
+        search_results = retriever.search(
             query_vector=query_vector,
             top_k=top_k,
         )
@@ -40,3 +36,13 @@ class VSSRetriever:
             answer_ids.append(answer_id)
 
         return answer_ids, log_dict
+
+
+driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
+retriever = VSSRetriever(driver, ollama_embedder="qwen3-embedding:4b", temp=0.0, seed=7)
+
+q = "Show me some throwing equipment from the brand DSP."
+
+answer_ids, log_dict = retriever.retrieve(q, top_k=100)
+
+print(answer_ids[:15], log_dict)

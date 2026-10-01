@@ -1,17 +1,17 @@
+import ast
+import time
 import yaml
 from typing import Literal
-import time
-import ast
 
-from pydantic import BaseModel
 from ollama import generate
-from neo4j import Driver, GraphDatabase
-from neo4j_graphrag.embeddings.ollama import OllamaEmbeddings
+from pydantic import BaseModel
+from neo4j import GraphDatabase
 from neo4j_graphrag.retrievers import VectorRetriever
 
-CONFIG_FILE = "../../configs/config.yaml"
+from paths import CONFIG_PATH
+from .base import Retriever
 
-with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 NER_PROMPT = config["retriever"]["structural"]["NER_prompt"]
@@ -25,16 +25,15 @@ class Entity(BaseModel):
     name: str
     type: Literal["product", "brand", "category", "color"]
 
+
 class Entities(BaseModel):
     entities: list[Entity]
 
-class StructuralRetriever:
-    def __init__(self, driver: Driver, ollama_embedder: str, model: str, temp: float, seed: int) -> None:
-        self.driver = driver
-        self.ollama_embedder = OllamaEmbeddings(model=ollama_embedder)
+
+class StructuralRetriever(Retriever):
+    def __init__(self, model: str, **kwargs) -> None:
+        super().__init__(**kwargs)
         self.model = model
-        self.temp = temp
-        self.seed = seed
 
     def retrieve(self, query: str, top_k: int) -> tuple[list, dict]:
         answer_ids = []
@@ -52,7 +51,14 @@ class StructuralRetriever:
             id, used_vss = self.link_entity_to_graph(entity)
             if (id, entity.type) not in seeds:
                 seeds.append((id, entity.type))
-            log_dict["seed_entities"].append({"mention_name": entity.name, "mention_type": entity.type, "linked_id": id, "used_vss": used_vss})
+            log_dict["seed_entities"].append(
+                {
+                    "mention_name": entity.name,
+                    "mention_type": entity.type,
+                    "linked_id": id,
+                    "used_vss": used_vss,
+                }
+            )
 
         # vectorize query
         query_emb = self.ollama_embedder.embed_query(
@@ -60,7 +66,7 @@ class StructuralRetriever:
             options={"temperature": self.temp, "seed": self.seed},
         )
 
-        # treat query as its own entity, similar to KAR
+        # treat query as an entity, similar to KAR
         query_entity_id = self.find_query_entity(query_emb)
         log_dict["query_entity_id"] = query_entity_id
         if query_entity_id not in seeds:
@@ -78,9 +84,7 @@ class StructuralRetriever:
 
         return answer_ids, log_dict
 
-    def extract_entities_from_query(
-        self, query: str
-    ) -> Entities:
+    def extract_entities_from_query(self, query: str) -> Entities:
         """Extract mentioned entities from the user query."""
         query_gen_prompt = NER_PROMPT.format(query=query)
         response = generate(
@@ -95,7 +99,7 @@ class StructuralRetriever:
 
     def link_entity_to_graph(self, entity: Entity) -> tuple[str, bool]:
         """Link an entity to the knowledge graph through exact-match name search, alternatively through document-based VSS."""
-        
+
         # try case-insensitive exact-matching
         text_search_cypher = TEXT_SEARCH_CYPHER.format(
             type=entity.type, name=entity.name.lower()
@@ -103,8 +107,8 @@ class StructuralRetriever:
         records, _, _ = self.driver.execute_query(text_search_cypher)
         if records:
             return records[0]["id"], False
-        
-        # resort to VSS 
+
+        # resort to VSS
         else:
             entity_emb = self.ollama_embedder.embed_query(
                 entity.name,
@@ -136,13 +140,19 @@ class StructuralRetriever:
         )
         result = results.items[0]
         content = ast.literal_eval(result.content)
-        
+
         return content["id"]
 
-    def compute_structural_scores(self, seeds: list[tuple[str, str]]) -> dict[float, list[str]]:
+    def compute_structural_scores(
+        self, seeds: list[tuple[str, str]]
+    ) -> dict[float, list[str]]:
         """Get KG entities based on their distance to seed entities."""
         # set score = 1 for product seeds, since they themselves might be answers
-        scores = {seed_id: HOP_SCORING[0] for seed_id, seed_type in seeds if seed_type == "product"}
+        scores = {
+            seed_id: HOP_SCORING[0]
+            for seed_id, seed_type in seeds
+            if seed_type == "product"
+        }
 
         for seed_id, _ in seeds:
             visited = set()
@@ -150,7 +160,9 @@ class StructuralRetriever:
 
             for hop in range(1, len(HOP_SCORING)):
                 # get all exactly-h-hop neighbors
-                neighbors_cypher_query = H_HOP_NEIGHBORS_CYPHER.format(id=seed_id, h=hop)
+                neighbors_cypher_query = H_HOP_NEIGHBORS_CYPHER.format(
+                    id=seed_id, h=hop
+                )
                 records, _, _ = self.driver.execute_query(neighbors_cypher_query)
 
                 # add score based on HOP_SCORING
@@ -169,7 +181,9 @@ class StructuralRetriever:
 
         return ids_by_score
 
-    def rank_by_vector_similarity(self, ids_by_score: dict[float, list[str]], query_emb: list[float], top_k: int) -> list[dict]:
+    def rank_by_vector_similarity(
+        self, ids_by_score: dict[float, list[str]], query_emb: list[float], top_k: int
+    ) -> list[dict]:
         """Rank KG entities by vector similarity to the query embedding."""
         entities = []
         remaining_budget = top_k
@@ -179,13 +193,35 @@ class StructuralRetriever:
                 VECTOR_RANK_CYPHER,
                 ids=ids,
                 query_vector=query_emb,
-                limit=remaining_budget
+                limit=remaining_budget,
             )
             for record in records:
-                entities.append({"id": record["id"], "struct_score": score, "vector_sim": record["vector_sim"]})
+                entities.append(
+                    {
+                        "id": record["id"],
+                        "struct_score": score,
+                        "vector_sim": record["vector_sim"],
+                    }
+                )
 
             remaining_budget -= len(records)
             if remaining_budget <= 0:
                 break
 
         return entities
+
+
+driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
+retriever = StructuralRetriever(
+    model="gemma4:26b",
+    driver=driver,
+    ollama_embedder="qwen3-embedding:4b",
+    temp=0.0,
+    seed=7,
+)
+
+q = "Show me some throwing equipment from the brand DSP."
+
+answer_ids, log_dict = retriever.retrieve(q, top_k=100)
+
+print(answer_ids[:15], log_dict)
