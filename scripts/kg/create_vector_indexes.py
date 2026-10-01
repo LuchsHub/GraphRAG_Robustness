@@ -17,12 +17,17 @@ driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 for label in LABELS:
     driver.execute_query(f"""
-      CREATE VECTOR INDEX {label}_index IF NOT EXISTS
-      FOR (e:{label}) ON (e.embedding)
-      OPTIONS {{
-        indexConfig: {{
-          `vector.dimensions`: {EMBED_DIMENSIONS},
-          `vector.similarity_function`: 'cosine'
+        CREATE VECTOR INDEX {label}_index IF NOT EXISTS
+        FOR (e:{label}) ON (e.embedding)
+        OPTIONS {{
+          indexConfig: {{
+            `vector.dimensions`: {EMBED_DIMENSIONS},
+            `vector.similarity_function`: 'cosine'
+          }}
         }}
-      }}
-  """)
+    """)
+
+    driver.execute_query(f"""
+      CREATE FULLTEXT INDEX {label}_fulltext_index IF NOT EXISTS
+      FOR (e:{label}) ON EACH [e.name]
+    """)
