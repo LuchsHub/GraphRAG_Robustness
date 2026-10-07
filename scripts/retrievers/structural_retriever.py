@@ -207,7 +207,7 @@ class StructuralRetriever(Retriever):
         return entities
 
 
-driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "Frechi2005"))
+driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
 retriever = StructuralRetriever(
     model="gemma4:26b",
     driver=driver,
