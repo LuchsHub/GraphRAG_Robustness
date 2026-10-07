@@ -96,30 +96,26 @@ error_simulation:
 
 retriever:
   structural:
-    NER_prompt: |- # heavily shortened version of the PathRAG NER prompt
-      Given a list of entity types, identify all entities of those types from the query.
-
-      For each identified entity, extract the following information:
-      - name: Name of the entity.
-      - type: One of the following types: [product, brand, category, color]
+    NER_prompt: |-
+      Identify all entities from the query.
 
       Query: {query}
 
       Output: 
     text_search_cypher: |- # use fulltext index to find exact-matching KG entities, ignoring case
-      CALL db.index.fulltext.queryNodes("{type}_fulltext_index", "\"{name}\"") 
+      CALL db.index.fulltext.queryNodes("{index_name}", "\"{entity_name}\"") 
       YIELD node
-      WHERE toLower(node.name) = '{name}'
+      WHERE toLower(node.name) = '{entity_name}'
       RETURN node.id as id
     hop_scoring:     # scoring in KG based on distance to seed entities --> seeds get 1.0, 1-hop neighbors get 1.0, 2-hop neighbors get 0.5
       - 1.0
       - 0.5
       - 0.25
     h_hop_neighbors_cypher: |- # get all exactly-h-hop neighbors
-      MATCH (start {{id: "{id}"}})-[*{h}]->(neighbor:product)
+      MATCH (start {{id: "{id}"}})-[*{h}]->(neighbor)
       RETURN collect(DISTINCT neighbor.id) AS ids
     vector_rank_cypher: |- # ranks products by vector similarity to the query, limited to only return requested results
-      MATCH (p:product)
+      MATCH (p{label})
       WHERE p.id IN $ids
       RETURN p.id AS id, vector.similarity.cosine(p.embedding, $query_vector) AS vector_sim
       ORDER BY vector_sim DESC
