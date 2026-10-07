@@ -95,6 +95,16 @@ error_simulation:
     drop_probability: 0.3 # probability of dropping a document
 
 retriever:
+  vss:
+    vector_search_cypher: |-
+      MATCH (e{label})
+        SEARCH e IN (
+          VECTOR INDEX {vector_index_name}
+          FOR {query_vector}
+          LIMIT 500
+        ) SCORE AS similarityScore
+      RETURN e.id as id, similarityScore
+      LIMIT {top_k}
   structural:
     NER_prompt: |-
       Identify all entities from the query.

@@ -1,19 +1,15 @@
-import ast
 import time
+import yaml
 
 from neo4j import GraphDatabase
-from neo4j_graphrag.retrievers import VectorRetriever
 
+from paths import CONFIG_PATH
 from .base import Retriever
 
-VECTOR_SEARCH_CYPHER = """MATCH (e{label})
-  SEARCH e IN (
-    VECTOR INDEX {vector_index_name}
-    FOR {query_vector}
-    LIMIT 500
-  ) SCORE AS similarityScore
-RETURN e.id as id, similarityScore
-LIMIT {top_k}"""
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f)
+
+VECTOR_SEARCH_CYPHER = config["retriever"]["vss"]["vector_search_cypher"]
 
 
 class VSSRetriever(Retriever):
