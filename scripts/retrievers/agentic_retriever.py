@@ -3,38 +3,50 @@ from typing import Optional
 
 from neo4j import GraphDatabase
 from ollama import chat
+from pydantic import BaseModel
 
 from .base import Retriever
-
 
 # Graph-CoT + ARK + GoG
 PROMPT = """You are exploring a knowledge graph to find specific entities that answer complex questions.
 Solve the task with interleaving Thought, Action, Observation steps. 
 Thought can reason about the current situation, and Action can be three types:
 
-(1) RetrieveNode, which retrieves related nodes from the graph according to the corresponding query.
+(1) retrieve_nodes, which retrieves related nodes from the graph according to the corresponding query.
 - query (required): Keywords, entity names, or descriptive terms
 - size (required): Number of results to return
 
-(2) NeighbourCheck, which lists the neighbours of the node in the graph and returns them.
+(2) check_neighbors, which lists the neighbours of the node in the graph and returns them.
 - node_id (required): The ID of the node to explore around
 - query (optional): Keywords to filter neighborhood results
 
-(3) Finish, which returns the answer and finishes the task.
+(3) finish, which returns the answer and finishes the task.
 - answer_ids (required): List of node IDs as the final answer to the question"""
 
-def RetrieveNode(query: str, size: int):
-    pass
 
-def NeighbourCheck(node_id: int, query: Optional[str] = None):
-    pass
+class retrieve_nodes(BaseModel):
+    query: str
+    size: int
 
-def Finish(answer_ids: list[int]):
-    pass
+
+class check_neighbors(BaseModel):
+    node_id: int
+    query: Optional[str]
+
+
+class finish(BaseModel):
+    answer_ids: list[int]
+
+
+class Step(BaseModel):
+    thought: str
+    action: retrieve_nodes | check_neighbors | finish
 
 
 class AgenticRetriever(Retriever):
-    def __init__(self, model: str, fulltext_index_name: str, max_steps: int, **kwargs) -> None:
+    def __init__(
+        self, model: str, fulltext_index_name: str, max_steps: int, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.model = model
         self.fulltext_index_name = fulltext_index_name
@@ -46,7 +58,10 @@ class AgenticRetriever(Retriever):
 
         start_time = time.time()
 
-        messages = [{"role": "system", "content": PROMPT}, {"role": "user", "content": query}]
+        messages = [
+            {"role": "system", "content": PROMPT},
+            {"role": "user", "content": query},
+        ]
 
         i = 0
         while i < self.max_steps:
@@ -54,23 +69,38 @@ class AgenticRetriever(Retriever):
             response = chat(
                 model="gemma4:26b",
                 messages=messages,
-                think="high",
-                tools=[RetrieveNode, NeighbourCheck, Finish],
+                think=False,
+                format=Step.model_json_schema(),
                 options={"temperature": self.temp, "seed": self.seed},
             )
-
-            print(f"Thinking {i+1}: {response.message.thinking}")
-            print(f"Action {i+1}: {response.message.tool_calls[0].function.name}")
-
-            """ messages.append({"role": "assistant", "content": f"Thought {i+1}: {step.thought}"})
-
+            step = Step.model_validate_json(response.message.content)
+            messages.append(
+                {"role": "assistant", "content": f"Thought {i+1}: {step.thought}"}
+            )
             tool_name = type(step.action).__name__
-            params_str = ", ".join(f"{k}={v}" for k, v in step.action.model_dump().items())
+            params_str = "".join(
+                f"{k}={v}" for k, v in step.action.model_dump().items()
+            )
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"Action {i+1}: {tool_name}({params_str})",
+                }
+            )
 
-            print(tool_name, params_str) """
+            if isinstance(step.action, retrieve_nodes):
+                # Handle retrieve_nodes action
+                pass
+            elif isinstance(step.action, check_neighbors):
+                # Handle check_neighbors action
+                pass
+            elif isinstance(step.action, finish):
+                # Handle finish action
+                pass
 
+            i += 1
 
-
+        return messages
 
 
 driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
@@ -87,3 +117,6 @@ retriever = AgenticRetriever(
     seed=7,
 )
 answer_ids = retriever.retrieve(query=query, top_k=5, entity_type="product")
+
+for msg in answer_ids:
+    print(msg)
