@@ -1,18 +1,20 @@
-import yaml
 import csv
 import random
 import time
+import yaml
 
 from neo4j import GraphDatabase
 import ollama
 
-TEMPLATES_FILE = "../../configs/rel_templates.yaml"
-CONFIG_FILE = "../../configs/config.yaml"
-OUTPUT_FILE = "../../qa_datasets/rel_amazon.csv"
+from paths import ROOT_PATH, CONFIG_PATH
 
-with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
+TEMPLATES_FILE_PATH = ROOT_PATH / "configs" / "rel_templates.yaml"
+OUTPUT_FILE_PATH = ROOT_PATH / "qa_datasets" / "rel_amazon.csv"
+FAILED_GENERATIONS_FILE_PATH = ROOT_PATH / "qa_datasets" / "rel_amazon_timeouts.txt"
+
+with open(TEMPLATES_FILE_PATH, "r", encoding="utf-8") as f:
     templates = yaml.safe_load(f)
-with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 LLM_SEED = config["models"]["seed"]
@@ -33,13 +35,14 @@ driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 client = ollama.Client(timeout=60.0)
 
 row_id = 0
-with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
+with open(OUTPUT_FILE_PATH, "w", encoding="utf-8") as outfile, open(
+    FAILED_GENERATIONS_FILE_PATH, "w", encoding="utf-8"
+) as fails_file:
     writer = csv.DictWriter(
         outfile, fieldnames=["id", "template_id", "query", "answer_ids", "triples"]
     )
     writer.writeheader()
 
-    failed_generations = []
     for template in templates["templates"]:
         print(template["id"], template["name"])
 
@@ -75,7 +78,7 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
                 )
             except Exception as e:
                 print(e)
-                failed_generations.append((template["id"], instantiated_assignment))
+                fails_file.write(f"{prompt}\n------------------------\n")
                 time.sleep(5)
                 continue
 
@@ -90,6 +93,3 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
             )
 
             row_id += 1
-
-print("Fin.")
-print(f"Failed: {failed_generations}")
