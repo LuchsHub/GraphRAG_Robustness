@@ -1,25 +1,10 @@
-from ollama import chat
-from pydantic import BaseModel
+import time
 from typing import Optional
 
+from neo4j import GraphDatabase
+from ollama import chat
 
-class RetrieveNode(BaseModel):
-    query: str
-    size: int
-
-
-class NeighbourCheck(BaseModel):
-    node_id: int
-    query: Optional[str]
-
-
-class Finish(BaseModel):
-    answer_ids: list[int]
-
-
-class Step(BaseModel):
-    thought: str
-    action: RetrieveNode | NeighbourCheck | Finish
+from .base import Retriever
 
 
 # Graph-CoT + ARK + GoG
@@ -36,21 +21,69 @@ Thought can reason about the current situation, and Action can be three types:
 - query (optional): Keywords to filter neighborhood results
 
 (3) Finish, which returns the answer and finishes the task.
-- answer_ids (required): List of node IDs as the final answer to the question
+- answer_ids (required): List of node IDs as the final answer to the question"""
 
-Question: {question}"""
+def RetrieveNode(query: str, size: int):
+    pass
 
-query = PROMPT.format(
-    question="Is there an Aminco brand pin for an NFL helmet that you could recommend?"
-)
-messages = [{"role": "user", "content": query}]
+def NeighbourCheck(node_id: int, query: Optional[str] = None):
+    pass
 
-response = chat(
+def Finish(answer_ids: list[int]):
+    pass
+
+
+class AgenticRetriever(Retriever):
+    def __init__(self, model: str, fulltext_index_name: str, max_steps: int, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.model = model
+        self.fulltext_index_name = fulltext_index_name
+        self.max_steps = max_steps
+
+    def retrieve(self, query: str, top_k: int, entity_type: str) -> tuple[list, dict]:
+        answer_ids = []
+        log_dict = {}
+
+        start_time = time.time()
+
+        messages = [{"role": "system", "content": PROMPT}, {"role": "user", "content": query}]
+
+        i = 0
+        while i < self.max_steps:
+            # use native thinking for Thought step + tool calling API for Action step
+            response = chat(
+                model="gemma4:26b",
+                messages=messages,
+                think="high",
+                tools=[RetrieveNode, NeighbourCheck, Finish],
+                options={"temperature": self.temp, "seed": self.seed},
+            )
+
+            print(f"Thinking {i+1}: {response.message.thinking}")
+            print(f"Action {i+1}: {response.message.tool_calls[0].function.name}")
+
+            """ messages.append({"role": "assistant", "content": f"Thought {i+1}: {step.thought}"})
+
+            tool_name = type(step.action).__name__
+            params_str = ", ".join(f"{k}={v}" for k, v in step.action.model_dump().items())
+
+            print(tool_name, params_str) """
+
+
+
+
+
+driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
+query = "I'm looking for a high-quality, USA-made pocket knife with a high carbon steel blade, nickel silver bolsters, and a smooth delrin handle that is approximately 3 7/8 inches when closed."
+
+retriever = AgenticRetriever(
     model="gemma4:26b",
-    messages=messages,
-    think="high",
-    format=Step.model_json_schema(),
+    driver=driver,
+    ollama_embedder="qwen3-embedding:4b",
+    vector_index_name="entity_index",
+    fulltext_index_name="entity_fulltext_index",
+    max_steps=1,
+    temp=0.0,
+    seed=7,
 )
-step = Step.model_validate_json(response.message.content)
-print(step)
-print(type(step.action))
+answer_ids = retriever.retrieve(query=query, top_k=5, entity_type="product")
