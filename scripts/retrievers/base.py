@@ -9,13 +9,13 @@ class Retriever(ABC):
         self,
         driver: Driver,
         ollama_embedder: str,
-        vector_index_name: str,
+        vector_index_name_appendix: str,
         temp: float,
         seed: int,
     ) -> None:
         self.driver = driver
         self.ollama_embedder = OllamaEmbeddings(model=ollama_embedder)
-        self.vector_index_name = vector_index_name
+        self.vector_index_name_appendix = vector_index_name_appendix
         self.temp = temp
         self.seed = seed
 
