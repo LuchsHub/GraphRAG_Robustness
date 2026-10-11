@@ -1,19 +1,19 @@
 import time
-import yaml
 
 from neo4j import GraphDatabase
 
-from paths import CONFIG_PATH
+from configs.retriever_configs import VSSRetrieverConfig
 from .base import Retriever
-
-with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-    config = yaml.safe_load(f)
-
-VECTOR_SEARCH_CYPHER = config["retriever"]["vss"]["vector_search_cypher"]
 
 
 class VSSRetriever(Retriever):
-    def retrieve(self, query: str, top_k: int, entity_type: str) -> tuple[list, dict]:
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.config = VSSRetrieverConfig()
+
+    def retrieve(
+        self, query: str, top_k: int, answer_entity_type: str
+    ) -> tuple[list, dict]:
         answer_ids = []
         log_dict = {}
 
@@ -22,9 +22,10 @@ class VSSRetriever(Retriever):
             query,
             options={"temperature": self.temp, "seed": self.seed},
         )
-        vector_search_cypher = VECTOR_SEARCH_CYPHER.format(
-            label=f":{entity_type}" if entity_type else "",
-            vector_index_name=self.vector_index_name,
+        vector_index_name = f"{answer_entity_type}{self.vector_index_name_appendix}"
+        vector_search_cypher = self.config.vector_search_cypher.format(
+            label=answer_entity_type,
+            vector_index_name=vector_index_name,
             query_vector=query_vector,
             top_k=top_k,
         )
@@ -42,15 +43,15 @@ class VSSRetriever(Retriever):
 
 driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
 retriever = VSSRetriever(
-    driver,
+    driver=driver,
     ollama_embedder="qwen3-embedding:4b",
-    vector_index_name="entity_index",
+    vector_index_name_appendix="_index",
     temp=0.0,
     seed=7,
 )
 
-q = "Show me some throwing equipment from the brand DSP."
+q = "Where can I find a handcuff case made by Gould & Goodrich?"
 
-answer_ids, log_dict = retriever.retrieve(q, top_k=100, entity_type="product")
+answer_ids, log_dict = retriever.retrieve(q, top_k=100, answer_entity_type="product")
 
 print(len(answer_ids), answer_ids[:15], log_dict)
