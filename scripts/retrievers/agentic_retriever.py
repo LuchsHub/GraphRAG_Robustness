@@ -1,64 +1,55 @@
 import time
-import yaml
 from typing import Optional
-
 import ollama
 from neo4j import GraphDatabase
 
-from paths import CONFIG_PATH
+from configs.retriever_configs import AgenticRetrieverConfig
 from .base import Retriever
-
-with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-    config = yaml.safe_load(f)
-
-SYSTEM_PROMPT = config["retriever"]["agentic"]["system_prompt"]
-SCHEMA = config["retriever"]["agentic"]["schema"]
-VSS_CYPHER = config["retriever"]["agentic"]["vss_cypher"]
-NEIGHBORS_CYPHER = config["retriever"]["agentic"]["neighbors_cypher"]
-GET_DOCS_CYPHER = config["retriever"]["agentic"]["get_docs_cypher"]
 
 
 class AgenticRetriever(Retriever):
     def __init__(
         self,
         model: str,
+        graph_schema: str,
         standard_label: str,
-        max_steps: int,
+        entity_types: list[str],
+        relation_types: list[str],
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.model = model
+        self.graph_schema = graph_schema
         self.standard_label = standard_label
-        self.max_steps = max_steps
+        self.entity_types = entity_types
+        self.relation_types = relation_types
 
         self.client = ollama.Client(timeout=60)
 
     def global_search(
-        self, search_term: str, node_type: Optional[str] = None, top_k: int = 10
+        self, search_term: str, top_k: int, node_type: Optional[str] = None
     ) -> str:
-        """Retrieve nodes from the knowledge graph based on semantic similarity to a search term
-        
-        Args:
-            search_term: Keywords, entity names, or descriptive terms
-            top_k: Number of nodes to return (min 10 for accuracy)
-            node_type (optional): Filter by entity type, one of 'product', 'color', 'brand', 'category'
-        """
-        if node_type and node_type not in ["product", "color", "brand", "category"]:
-            return f"Invalid node type: {node_type}. Must be one of 'product', 'color', 'brand', 'category'."
-        
+        if node_type and node_type not in self.entity_types:
+            return (
+                f"Invalid node type: {node_type}. Must be one of: {self.entity_types}"
+            )
+
         query_emb = self.ollama_embedder.embed_query(
             search_term,
             options={"temperature": self.temp, "seed": self.seed},
         )
 
+        # determine target label and vector index
+        # search for "product" in "product_index" (specific)
         if node_type:
             label = node_type
-            vector_index_name = f"{node_type}{self.vector_index_name}"
+            vector_index_name = f"{node_type}{self.vector_index_name_appendix}"
+        # search for "entity" in "entity_index" (all nodes)
         else:
             label = self.standard_label
-            vector_index_name = f"{self.standard_label}{self.vector_index_name}"
+            vector_index_name = f"{self.standard_label}{self.vector_index_name_appendix}"
 
-        vss_cypher = VSS_CYPHER.format(
+        vss_cypher = AgenticRetrieverConfig.vss_cypher.format(
             label=label,
             vector_index_name=vector_index_name,
             query_vector=query_emb,
@@ -68,12 +59,12 @@ class AgenticRetriever(Retriever):
 
         nodes_str = ""
         for record in records:
+            # if no node type was specified, get it from the node's labels
             if not node_type:
                 node_labels = record["labels"]
                 node_labels.remove(self.standard_label)
                 node_type = node_labels[0]
 
-            # result formatting inspired by ARK
             node_str = f"id: {record["id"]} - type: {node_type} - name: {record["name"]} - score: {record["similarityScore"]:.3f}\n"
             nodes_str += node_str
 
@@ -84,76 +75,61 @@ class AgenticRetriever(Retriever):
         node_id: int,
         edge_type: Optional[str] = None,
     ) -> str:
-        """List all 1-hop neighbors of a node
-        
-        Args:
-            node_id: The ID of the node to explore around
-            edge_type (optional): Only return neighbors connected by this type of edge, one of 'also_view', 'also_buy', 'has_category', 'has_brand', 'has_color'
-        """
-        if edge_type and edge_type not in ["also_view", "also_buy", "has_category", "has_brand", "has_color"]:
-            return f"Invalid edge type: {edge_type}. Must be one of 'also_view', 'also_buy', 'has_category', 'has_brand', 'has_color'."
+        if edge_type and edge_type not in self.relation_types:
+            return (
+                f"Invalid edge type: {edge_type}. Must be one of: {self.relation_types}"
+            )
 
-        if edge_type:
-            edge_type = f":{edge_type}"
-        else:
-            edge_type = ""
-
-        neighbors_cypher = NEIGHBORS_CYPHER.format(id=node_id, edge_type=edge_type)
+        edge_filter = f":{edge_type}" if edge_type else ""
+        neighbors_cypher = AgenticRetrieverConfig.neighbors_cypher.format(
+            id=node_id, edge_type=edge_filter
+        )
 
         records, _, _ = self.driver.execute_query(neighbors_cypher)
-        print(len(records))
 
         nodes_str = ""
         for record in records:
             node_labels = record["labels"]
             node_labels.remove(self.standard_label)
-            node_type = node_labels[0]
+            resolved_type = node_labels[0] if node_labels else "unknown"
 
-            node_str = f"relationship: {record["rel"]} - id: {record["id"]} - name: {record["name"]} - type: {node_type}\n"
+            node_str = f"relationship: {record["rel"]} - id: {record["id"]} - type: {resolved_type} - name: {record["name"]}\n"
             nodes_str += node_str
 
         return nodes_str
 
-    def get_document(self, node_ids: list[int]) -> str:
-        """Retrieve the documents associated with a list of nodes
-        
-        Args:
-            node_ids: A list of node IDs
-        """
+    def get_documents(self, node_ids: list[int]) -> str:
         str_ids = [str(node_id) for node_id in node_ids]
-        records, _, _ = self.driver.execute_query(GET_DOCS_CYPHER, node_ids=str_ids)
+        records, _, _ = self.driver.execute_query(
+            AgenticRetrieverConfig.get_docs_cypher, node_ids=str_ids
+        )
+
         docs_string = ""
         for record in records:
-            docs_string += f"id: {record['id']}, document:\n{record['document']}\n"
+            docs_string += f"id: {record["id"]}, document:\n{record["document"]}\n"
 
         return docs_string
 
     def finish(self, answer_ids: list[int]) -> list[int]:
-        """Return the answer and finishes the task.
-        
-        Args:
-            answer_ids: A list of node IDs as the final answers to the query
-        """
         return answer_ids
 
     def retrieve(self, query: str, top_k: int, entity_type: str) -> tuple[list, dict]:
-        answer_ids = []
-        log_dict = {}
+        tool_schemas = AgenticRetrieverConfig.get_tool_schemas(
+            entity_types=self.entity_types, relation_types=self.relation_types
+        )
 
-        available_functions = {
-            "global_search": self.global_search,
-            "local_search": self.local_search,
-            "get_document": self.get_document,
-            "finish": self.finish,
-        }
-        tools = [self.global_search, self.local_search, self.get_document, self.finish]
-
-        start_time = time.time()
+        available_functions = {}
+        for tool in tool_schemas:
+            available_functions[tool["function"]["name"]] = getattr(
+                self, tool["function"]["name"]
+            )
 
         messages = [
             {
                 "role": "system",
-                "content": PROMPT.format(schema=SCHEMA),
+                "content": AgenticRetrieverConfig.system_prompt.format(
+                    schema=self.graph_schema
+                ),
             },
             {
                 "role": "user",
@@ -162,7 +138,8 @@ class AgenticRetriever(Retriever):
         ]
 
         step = 0
-        while step < self.max_steps:
+        log_dict = {}
+        while step < AgenticRetrieverConfig.max_steps:
             step += 1
             print(f"-----Step {step}-----")
 
@@ -170,69 +147,81 @@ class AgenticRetriever(Retriever):
                 response = self.client.chat(
                     model=self.model,
                     messages=messages,
-                    tools=tools,
-                    think=True,
+                    think="high",
+                    tools=tool_schemas,
                     options={"temperature": self.temp, "seed": self.seed},
                 )
             except Exception as e:
-                print(e)
-                return answer_ids, log_dict
-            
-            # Add assistant response to history
+                return [], log_dict
+
             messages.append(response.message)
+            print("Thinking: ", response.message.thinking)
+            print("Content: ", response.message.content)
 
-            print("Thinking:", response.message.thinking)
-            print("Content:", response.message.content)
-
-            # Process tool calls
             if not response.message.tool_calls:
-                messages.append({
-                    "role": "tool",
-                    "content": "No tool calls made. If you want to give the final answer, call the finish action.",
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "content": "No tool calls made. If you want to give the final answer, call the finish action.",
+                    }
+                )
                 continue
+
             for tc in response.message.tool_calls:
-                if tc.function.name  in available_functions:
-                    print(f"Calling {tc.function.name } with arguments: {tc.function.arguments}")
+                if tc.function.name in available_functions:
+                    print(
+                        f"Calling {tc.function.name} with arguments: {tc.function.arguments}"
+                    )
                     try:
-                        result = available_functions[tc.function.name ](**tc.function.arguments)
+                        result = available_functions[tc.function.name](
+                            **tc.function.arguments
+                        )
                     except Exception as e:
-                        result = f"Error executing {tc.function.name}: {e}"
+                        result = f"Error: {e}"
 
-                        
                     if tc.function.name == "finish":
-                        return result, log_dict
-                    
-                    print(f"Tool Result:\n{result[:100]}\n")
+                        return result[:top_k], log_dict
 
-                    messages.append({
-                        "role": "tool",
-                        "tool_name": tc.function.name,
-                        "content": result,
-                    })
+                    print(result[:100])
+
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_name": tc.function.name,
+                            "content": str(result),
+                        }
+                    )
                 else:
-                    messages.append({
-                        "role": "tool",
-                        "content": f"Unknown tool: {tc.function.name}",
-                    })
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "content": f"Unknown tool: {tc.function.name}",
+                        }
+                    )
 
- 
         return [], log_dict
 
 
 driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
-query = "What are some essential Trademark Poker brand chip sets for playing Texas Hold'em?"
+GRAPH_SCHEMA = """product - also_view - product
+product - also_buy - product
+product - has_category - category
+product - has_brand - brand
+product - has_color - color"""
+QUERY = "Show me some throwing equipment from the brand DSP."
 
 retriever = AgenticRetriever(
     model="qwen3.8:27b",
     driver=driver,
     ollama_embedder="qwen3-embedding:4b",
-    vector_index_name="_index",
+    vector_index_name_appendix="_index",
     standard_label="entity",
-    max_steps=100,
+    entity_types=["product", "brand", "category", "color"],
+    relation_types=["also_view", "also_buy", "has_category", "has_brand", "has_color"],
+    graph_schema=GRAPH_SCHEMA,
     temp=0.0,
     seed=7,
 )
 
-x = retriever.retrieve(query=query, top_k=5, entity_type="product")
+x = retriever.retrieve(query=QUERY, top_k=5, entity_type="product")
 print(x)

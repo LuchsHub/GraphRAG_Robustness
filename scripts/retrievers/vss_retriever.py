@@ -7,10 +7,6 @@ from .base import Retriever
 
 
 class VSSRetriever(Retriever):
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.config = VSSRetrieverConfig()
-
     def retrieve(
         self, query: str, top_k: int, answer_entity_type: str
     ) -> tuple[list, dict]:
@@ -23,7 +19,7 @@ class VSSRetriever(Retriever):
             options={"temperature": self.temp, "seed": self.seed},
         )
         vector_index_name = f"{answer_entity_type}{self.vector_index_name_appendix}"
-        vector_search_cypher = self.config.vector_search_cypher.format(
+        vector_search_cypher = VSSRetrieverConfig.vector_search_cypher.format(
             label=answer_entity_type,
             vector_index_name=vector_index_name,
             query_vector=query_vector,
