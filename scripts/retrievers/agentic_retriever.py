@@ -1,42 +1,21 @@
 import time
+import yaml
 from typing import Optional
 
 import ollama
 from neo4j import GraphDatabase
 
+from paths import CONFIG_PATH
 from .base import Retriever
 
-PROMPT = """You are exploring a knowledge graph to find specific entities that answer complex questions.
-Solve the task with interleaving Thought, Action, Observation steps. 
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f)
 
-The following graph schema describes which edges can exist between which node types:
-{schema}
-
-When you are ready to finish the search, call the finish action.
-
-Guidelines:
-- Provide multiple options when appropriate: For queries without explicit entity mentions, aim to give users many relevant options
-- Start broad, then narrow: Begin with global searches, then focus on specific neighborhoods
-- Exploit seed nodes first: Try finding all entities mentioned in the query before starting neighborhood explorations
-- Recognize dead ends: If local searches yield no relevant results over multiple steps, consider performing a new global search with different parameters
-- Use filters strategically: Apply node_type and edge_type filters to reduce noise and focus exploration"""
-
-SCHEMA = """product - also_view - product
-product - also_buy - product
-product - has_category - category
-product - has_brand - brand
-product - has_color - color"""
-
-VSS_CYPHER = """MATCH (e:{label})
-SEARCH e IN (
-    VECTOR INDEX {vector_index_name}
-    FOR {query_vector}
-    LIMIT {top_k}
-) SCORE AS similarityScore
-RETURN e.id as id, labels(e) as labels, e.name as name, similarityScore"""
-
-NEIGHBORS_CYPHER = """MATCH (start {{id: "{id}"}})-[r{edge_type}]->(neighbor)
-RETURN type(r) as rel, neighbor.id as id, labels(neighbor) as labels, neighbor.name as name"""
+SYSTEM_PROMPT = config["retriever"]["agentic"]["system_prompt"]
+SCHEMA = config["retriever"]["agentic"]["schema"]
+VSS_CYPHER = config["retriever"]["agentic"]["vss_cypher"]
+NEIGHBORS_CYPHER = config["retriever"]["agentic"]["neighbors_cypher"]
+GET_DOCS_CYPHER = config["retriever"]["agentic"]["get_docs_cypher"]
 
 
 class AgenticRetriever(Retriever):
@@ -142,12 +121,7 @@ class AgenticRetriever(Retriever):
             node_ids: A list of node IDs
         """
         str_ids = [str(node_id) for node_id in node_ids]
-        Q = """
-        MATCH (n)
-        WHERE n.id IN $node_ids
-        RETURN n.id AS id, n.document AS document
-        """        
-        records, _, _ = self.driver.execute_query(Q, node_ids=str_ids)
+        records, _, _ = self.driver.execute_query(GET_DOCS_CYPHER, node_ids=str_ids)
         docs_string = ""
         for record in records:
             docs_string += f"id: {record['id']}, document:\n{record['document']}\n"
@@ -246,7 +220,7 @@ class AgenticRetriever(Retriever):
         return [], log_dict
 
 
-driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "Frechi2005"))
+driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
 query = "What are some essential Trademark Poker brand chip sets for playing Texas Hold'em?"
 
 retriever = AgenticRetriever(

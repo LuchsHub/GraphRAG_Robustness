@@ -51,7 +51,7 @@ qa_dataset_generation:
 
       Query: 
     similar_nodes_cypher: |-
-      MATCH (p1:product {{id: '{id}'}})
+      MATCH (p1:product {{id: "{id}"}})
       MATCH (p2:product)
         SEARCH p2 IN (
           VECTOR INDEX product_index
@@ -115,7 +115,7 @@ retriever:
     text_search_cypher: |- # use fulltext index to find exact-matching KG entities, ignoring case
       CALL db.index.fulltext.queryNodes("{index_name}", "\"{entity_name}\"") 
       YIELD node
-      WHERE toLower(node.name) = '{entity_name}'
+      WHERE toLower(node.name) = "{entity_name}"
       RETURN node.id as id
     hop_scoring:     # scoring in KG based on distance to seed entities --> seeds get 1.0, 1-hop neighbors get 1.0, 2-hop neighbors get 0.5
       - 1.0
@@ -130,3 +130,40 @@ retriever:
       RETURN p.id AS id, vector.similarity.cosine(p.embedding, $query_vector) AS vector_sim
       ORDER BY vector_sim DESC
       LIMIT $limit
+  agentic:
+    system_prompt: |-
+      You are exploring a knowledge graph to find specific entities that answer complex questions.
+      Solve the task with interleaving Thought, Action, Observation steps. 
+
+      The following graph schema describes which edges can exist between which node types:
+      {schema}
+
+      When you are ready to finish the search, call the finish action.
+
+      Guidelines:
+      - Provide multiple options when appropriate: For queries without explicit entity mentions, aim to give users many relevant options
+      - Start broad, then narrow: Begin with global searches, then focus on specific neighborhoods
+      - Exploit seed nodes first: Try finding all entities mentioned in the query before starting neighborhood explorations
+      - Recognize dead ends: If local searches yield no relevant results over multiple steps, consider performing a new global search with different parameters
+      - Use filters strategically: Apply node_type and edge_type filters to reduce noise and focus exploration
+    schema: |-
+      product - also_view - product
+      product - also_buy - product
+      product - has_category - category
+      product - has_brand - brand
+      product - has_color - color
+    vss_cypher: |-
+      MATCH (e:{label})
+      SEARCH e IN (
+          VECTOR INDEX {vector_index_name}
+          FOR {query_vector}
+          LIMIT {top_k}
+      ) SCORE AS similarityScore
+      RETURN e.id as id, labels(e) as labels, e.name as name, similarityScore
+    neighbors_cypher: |-
+      MATCH (start {{id: "{id}"}})-[r{edge_type}]->(neighbor)
+      RETURN type(r) as rel, neighbor.id as id, labels(neighbor) as labels, neighbor.name as name
+    get_docs_cypher: |-
+      MATCH (n)
+      WHERE n.id IN $node_ids
+      RETURN n.id AS id, n.document AS document
