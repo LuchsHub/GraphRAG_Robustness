@@ -32,14 +32,14 @@ TEMPERATURE = config["models"]["temperature"]
 
 random.seed(SELECTION_SEED)
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-client = ollama.Client(timeout=60.0)
+client = ollama.Client(timeout=60)
 
 row_id = 0
 with open(OUTPUT_FILE_PATH, "w", encoding="utf-8") as outfile, open(
     FAILED_GENERATIONS_FILE_PATH, "w", encoding="utf-8"
 ) as fails_file:
     writer = csv.DictWriter(
-        outfile, fieldnames=["id", "template_id", "query", "answer_ids", "triples"]
+        outfile, fieldnames=["id", "template_id", "query", "answer_ids", "assignment"]
     )
     writer.writeheader()
 
@@ -57,24 +57,25 @@ with open(OUTPUT_FILE_PATH, "w", encoding="utf-8") as outfile, open(
         for assignment in assignments:
             print(row_id)
 
-            # instantiate assignment: get initial entity names, golden triples, answer count, answer ids
+            # instantiate assignment: answer count, answer ids
             records, _, _ = driver.execute_query(
                 template["instantiate_assignment_cypher"], **assignment
             )
             instantiated_assignment = records[0]
 
-            llm_input = template["llm_input"].format(**instantiated_assignment)
+            base_query = template["base_query"].format(**instantiated_assignment)
 
             prompt = PROMPT.format(
-                path=llm_input, num_answers=instantiated_assignment["answer_count"]
+                num_answers=instantiated_assignment["answer_count"],
+                base_query=base_query,
             )
 
             try:
                 response = client.generate(
                     model=MODEL,
                     prompt=prompt,
-                    options={"temperature": TEMPERATURE, "seed": LLM_SEED},
                     think="high",
+                    options={"seed": LLM_SEED, "temperature": TEMPERATURE},
                 )
             except Exception as e:
                 print(e)
@@ -88,7 +89,7 @@ with open(OUTPUT_FILE_PATH, "w", encoding="utf-8") as outfile, open(
                     "template_id": template["id"],
                     "query": response.response,
                     "answer_ids": instantiated_assignment["answer_ids"],
-                    "triples": instantiated_assignment["triples"],
+                    "assignment": dict(assignment),
                 }
             )
 

@@ -8,13 +8,11 @@ templates:
       WHERE answer_count <= 10
       RETURN p.id AS p_id
     instantiate_assignment_cypher: |
-      MATCH path = (p:product {id: $p_id})-[:also_buy]->(target:product)
-      UNWIND relationships(path) AS r
+      MATCH (p:product {id: $p_id})-[:also_buy]->(target:product)
       RETURN p.name AS p_name,
         count(DISTINCT target) AS answer_count,
-        collect(DISTINCT toInteger(target.id)) AS answer_ids,
-        collect(DISTINCT [toInteger(startNode(r).id), type(r), toInteger(endNode(r).id)]) AS triples
-    llm_input: ('{p_name}':product)-[:also_buy]-(target:product)
+        collect(DISTINCT toInteger(target.id)) AS answer_ids
+    base_query: "What products are often bought with {p_name}?"
   - id: 1
     name: "Find products from a given brand"
     hops: 1
@@ -24,13 +22,11 @@ templates:
       WHERE answer_count <= 10
       RETURN b.id AS b_id
     instantiate_assignment_cypher: |
-      MATCH path = (target:product)-[:has_brand]->(b:brand {id: $b_id})
-      UNWIND relationships(path) AS r
+      MATCH (target:product)-[:has_brand]->(b:brand {id: $b_id})
       RETURN b.name AS b_name,
         count(DISTINCT target) AS answer_count,
-        collect(DISTINCT toInteger(target.id)) AS answer_ids,
-        collect(DISTINCT [toInteger(startNode(r).id), type(r), toInteger(endNode(r).id)]) AS triples
-    llm_input: (target:product)-[:has_brand]-('{b_name}':brand)
+        collect(DISTINCT toInteger(target.id)) AS answer_ids
+    base_query: "What products are from the brand {b_name}?"
   - id: 2
     name: "Find colored products that are often bought with a given product"
     hops: 2
@@ -40,13 +36,11 @@ templates:
       WHERE answer_count <= 10
       RETURN p.id AS p_id, c.id AS c_id
     instantiate_assignment_cypher: |
-      MATCH path = (p:product {id: $p_id})<-[:also_buy]-(target:product)-[:has_color]->(c:color {id: $c_id})
-      UNWIND relationships(path) AS r
+      MATCH (p:product {id: $p_id})<-[:also_buy]-(target:product)-[:has_color]->(c:color {id: $c_id})
       RETURN p.name AS p_name, c.name AS c_name,
         count(DISTINCT target) AS answer_count,
-        collect(DISTINCT toInteger(target.id)) AS answer_ids,
-        collect(DISTINCT [toInteger(startNode(r).id), type(r), toInteger(endNode(r).id)]) AS triples
-    llm_input: ('{p_name}':product)-[:also_buy]-(target:product)-[:has_color]-('{c_name}':color)
+        collect(DISTINCT toInteger(target.id)) AS answer_ids
+    base_query: "What {c_name}-colored products are often bought with {p_name}?"
   - id: 3
     name: "Find product given brand and category"
     hops: 2
@@ -56,13 +50,11 @@ templates:
       WHERE answer_count <= 10
       RETURN b.id AS b_id, c.id AS c_id
     instantiate_assignment_cypher: |
-      MATCH path = (b:brand {id: $b_id})<-[:has_brand]-(target:product)-[:has_category]->(c:category {id: $c_id})
-      UNWIND relationships(path) AS r
+      MATCH (b:brand {id: $b_id})<-[:has_brand]-(target:product)-[:has_category]->(c:category {id: $c_id})
       RETURN b.name AS b_name, c.name AS c_name,
         count(DISTINCT target) AS answer_count,
-        collect(DISTINCT toInteger(target.id)) AS answer_ids,
-        collect(DISTINCT [toInteger(startNode(r).id), type(r), toInteger(endNode(r).id)]) AS triples
-    llm_input: ('{b_name}':brand)-[:has_brand]-(target:product)-[:has_category]-('{c_name}':category)
+        collect(DISTINCT toInteger(target.id)) AS answer_ids
+    base_query: "Which products from the brand {b_name} belong to category {c_name}?"
   - id: 4
     name: "Find colored products often bought with products of a given category"
     hops: 3
@@ -72,13 +64,11 @@ templates:
       WHERE answer_count <= 10
       RETURN ca.id AS ca_id, co.id AS co_id
     instantiate_assignment_cypher: |
-      MATCH path = (ca:category {id: $ca_id})<-[:has_category]-(:product)-[:also_buy]->(target:product)-[:has_color]->(co:color {id: $co_id})
-      UNWIND relationships(path) AS r
+      MATCH (ca:category {id: $ca_id})<-[:has_category]-(:product)-[:also_buy]->(target:product)-[:has_color]->(co:color {id: $co_id})
       RETURN ca.name AS ca_name, co.name AS co_name,
         count(DISTINCT target) AS answer_count,
-        collect(DISTINCT toInteger(target.id)) AS answer_ids,
-        collect(DISTINCT [toInteger(startNode(r).id), type(r), toInteger(endNode(r).id)]) AS triples
-    llm_input: ('{ca_name}':category)-[:has_category]-(:product)-[:also_buy]-(target:product)-[:has_color]-('{co_name}':color)
+        collect(DISTINCT toInteger(target.id)) AS answer_ids
+    base_query: "What {co_name}-colored products are often bought with products of the category {ca_name}?"
   - id: 5
     name: "Find products often viewed with products of a given brand and category"
     hops: 3
@@ -89,11 +79,9 @@ templates:
       WHERE answer_count <= 10
       RETURN b.id AS b_id, c.id AS c_id
     instantiate_assignment_cypher: |
-      MATCH path1 = (c:category {id: $c_id})<-[:has_category]-(p:product)-[:has_brand]->(b:brand {id: $b_id}),
-            path2 = (p:product)-[:also_view]->(target:product)
-      UNWIND (relationships(path1) + relationships(path2)) AS r
+      MATCH (c:category {id: $c_id})<-[:has_category]-(p:product)-[:has_brand]->(b:brand {id: $b_id}),
+            (p:product)-[:also_view]->(target:product)
       RETURN b.name AS b_name, c.name AS c_name,
         count(DISTINCT target) AS answer_count,
-        collect(DISTINCT toInteger(target.id)) AS answer_ids,
-        collect(DISTINCT [toInteger(startNode(r).id), type(r), toInteger(endNode(r).id)]) AS triples
-    llm_input: (p:product)-[:also_view]-(target:product) & ('{c_name}':category)-[:has_category]-(p:product)-[:has_brand]-('{b_name}':brand)
+        collect(DISTINCT toInteger(target.id)) AS answer_ids
+    base_query: "What products are often viewed with {c_name} category products from the brand {b_name}?"
