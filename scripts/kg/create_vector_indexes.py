@@ -2,9 +2,9 @@ import yaml
 
 from neo4j import GraphDatabase
 
-CONFIG_FILE = "../../configs/config.yaml"
+from paths import CONFIG_PATH
 
-with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 NEO4J_URI = config["neo4j"]["uri"]
