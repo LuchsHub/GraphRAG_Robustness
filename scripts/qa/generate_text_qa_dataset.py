@@ -43,7 +43,7 @@ skb = load_skb("amazon", download_processed=True)
 random.seed(SELECTION_SEED)
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-client = ollama.Client(timeout=60.0)
+client = ollama.Client()
 
 # get random products
 product_ids = skb.get_node_ids_by_type("product")
@@ -57,8 +57,11 @@ with open(OUTPUT_FILE_PATH, "w", encoding="utf-8") as outfile, open(
     writer = csv.DictWriter(outfile, fieldnames=["id", "query", "answer_ids"])
     writer.writeheader()
 
+    output_schema = QueryAmbiguityCheck.model_json_schema()
+
     written_queries = 0
     for pid in random_product_ids:
+        print(written_queries)
         doc = skb.get_doc_info(pid, add_rel=False)
 
         # generate query based on document
@@ -97,7 +100,7 @@ with open(OUTPUT_FILE_PATH, "w", encoding="utf-8") as outfile, open(
                 prompt=query_ambiguity_prompt,
                 options={"temperature": TEMPERATURE, "seed": LLM_SEED},
                 think="high",
-                format=QueryAmbiguityCheck.model_json_schema(),
+                format=output_schema,
             )
         except Exception as e:
             print(e)
