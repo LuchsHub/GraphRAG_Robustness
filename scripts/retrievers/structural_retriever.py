@@ -70,14 +70,19 @@ class StructuralRetriever(Retriever):
             seeds.append((query_entity_id, answer_entity_type))
 
         # score and group by structural score
-        scores_by_id = self.compute_structural_scores(seeds, answer_entity_type)
+        ids_by_score = self.compute_structural_scores(seeds, answer_entity_type)
 
         # break ties with vector similarity, return top_k
-        ranked_entities = self.rank_by_vector_similarity(scores_by_id, query_emb, top_k)
-        answer_ids = [entity["id"] for entity in ranked_entities]
-        log_dict["scores"] = ranked_entities
+        ranked_entities = self.rank_by_vector_similarity(ids_by_score, query_emb, top_k)
 
-        log_dict["latency"] = time.time() - start_time
+        latency = time.time() - start_time
+        log_dict["latency"] = round(latency, 3)
+
+        answer_ids = [entity["id"] for entity in ranked_entities]
+        log_dict["scores"] = {
+            entity["id"]: (entity["struct_score"], entity["vector_sim"])
+            for entity in ranked_entities
+        }
 
         return answer_ids, log_dict
 
@@ -203,7 +208,7 @@ class StructuralRetriever(Retriever):
                     {
                         "id": record["id"],
                         "struct_score": score,
-                        "vector_sim": record["vector_sim"],
+                        "vector_sim": round(record["vector_sim"], 3),
                     }
                 )
 
@@ -226,7 +231,7 @@ retriever = StructuralRetriever(
     seed=7,
 )
 
-q = "Show me some throwing equipment from the brand DSP."
+q = "Show me some throwing equipment from IKEA."
 
 answer_ids, log_dict = retriever.retrieve(q, top_k=20, answer_entity_type="product")
 

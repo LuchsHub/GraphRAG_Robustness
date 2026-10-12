@@ -26,13 +26,14 @@ class VSSRetriever(Retriever):
             top_k=top_k,
         )
         records, _, _ = self.driver.execute_query(vector_search_cypher)
-        log_dict["latency"] = time.time() - start_time
+        latency = time.time() - start_time
+        log_dict["latency"] = round(latency, 3)
 
         log_dict["scores"] = {}
         for record in records:
             answer_id = record["id"]
             answer_ids.append(answer_id)
-            log_dict["scores"][answer_id] = record["similarityScore"]
+            log_dict["scores"][answer_id] = round(record["similarityScore"], 3)
 
         return answer_ids, log_dict
 
@@ -48,6 +49,6 @@ retriever = VSSRetriever(
 
 q = "Where can I find a handcuff case made by Gould & Goodrich?"
 
-answer_ids, log_dict = retriever.retrieve(q, top_k=100, answer_entity_type="product")
+answer_ids, log_dict = retriever.retrieve(q, top_k=20, answer_entity_type="product")
 
 print(len(answer_ids), answer_ids[:15], log_dict)
