@@ -1,5 +1,6 @@
 import time
 from typing import Optional
+
 import ollama
 from neo4j import GraphDatabase
 
@@ -24,7 +25,7 @@ class AgenticRetriever(Retriever):
         self.entity_types = entity_types
         self.relation_types = relation_types
 
-        self.client = ollama.Client(timeout=60)
+        self.client = ollama.Client()
 
     def global_search(
         self, search_term: str, top_k: int, node_type: Optional[str] = None
@@ -47,7 +48,9 @@ class AgenticRetriever(Retriever):
         # search for "entity" in "entity_index" (all nodes)
         else:
             label = self.standard_label
-            vector_index_name = f"{self.standard_label}{self.vector_index_name_appendix}"
+            vector_index_name = (
+                f"{self.standard_label}{self.vector_index_name_appendix}"
+            )
 
         vss_cypher = AgenticRetrieverConfig.vss_cypher.format(
             label=label,
@@ -59,13 +62,7 @@ class AgenticRetriever(Retriever):
 
         nodes_str = ""
         for record in records:
-            # if no node type was specified, get it from the node's labels
-            if not node_type:
-                node_labels = record["labels"]
-                node_labels.remove(self.standard_label)
-                node_type = node_labels[0]
-
-            node_str = f"id: {record["id"]} - type: {node_type} - name: {record["name"]} - score: {record["similarityScore"]:.3f}\n"
+            node_str = f"id: {record["id"]} - name: {record["name"]} - score: {record["similarityScore"]:.3f}\n"
             nodes_str += node_str
 
         return nodes_str
@@ -89,11 +86,7 @@ class AgenticRetriever(Retriever):
 
         nodes_str = ""
         for record in records:
-            node_labels = record["labels"]
-            node_labels.remove(self.standard_label)
-            resolved_type = node_labels[0] if node_labels else "unknown"
-
-            node_str = f"relationship: {record["rel"]} - id: {record["id"]} - type: {resolved_type} - name: {record["name"]}\n"
+            node_str = f"relationship: {record["rel"]} - id: {record["id"]} - name: {record["name"]}\n"
             nodes_str += node_str
 
         return nodes_str
@@ -111,9 +104,13 @@ class AgenticRetriever(Retriever):
         return docs_string
 
     def finish(self, answer_ids: list[int]) -> list[int]:
-        return answer_ids
+        return [int(id) for id in answer_ids]
 
     def retrieve(self, query: str, top_k: int, entity_type: str) -> tuple[list, dict]:
+        answer_ids = []
+        log_dict = {"steps": []}
+        finished = False
+
         tool_schemas = AgenticRetrieverConfig.get_tool_schemas(
             entity_types=self.entity_types, relation_types=self.relation_types
         )
@@ -137,11 +134,20 @@ class AgenticRetriever(Retriever):
             },
         ]
 
+        start_time = time.time()
+
         step = 0
-        log_dict = {}
+        total_eval_count = 0
         while step < AgenticRetrieverConfig.max_steps:
             step += 1
-            print(f"-----Step {step}-----")
+
+            if step == AgenticRetrieverConfig.max_steps:
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": "Last step. You must call the finish action now.",
+                    }
+                )
 
             try:
                 response = self.client.chat(
@@ -152,11 +158,11 @@ class AgenticRetriever(Retriever):
                     options={"temperature": self.temp, "seed": self.seed},
                 )
             except Exception as e:
-                return [], log_dict
+                log_dict["generation_error"] = str(e)
+                break
 
             messages.append(response.message)
-            print("Thinking: ", response.message.thinking)
-            print("Content: ", response.message.content)
+            total_eval_count += response.eval_count
 
             if not response.message.tool_calls:
                 messages.append(
@@ -167,11 +173,11 @@ class AgenticRetriever(Retriever):
                 )
                 continue
 
+            actions = []
             for tc in response.message.tool_calls:
+                actions.append((tc.function.name, tc.function.arguments))
+
                 if tc.function.name in available_functions:
-                    print(
-                        f"Calling {tc.function.name} with arguments: {tc.function.arguments}"
-                    )
                     try:
                         result = available_functions[tc.function.name](
                             **tc.function.arguments
@@ -179,10 +185,12 @@ class AgenticRetriever(Retriever):
                     except Exception as e:
                         result = f"Error: {e}"
 
-                    if tc.function.name == "finish":
-                        return result[:top_k], log_dict
+                    if len(result) > AgenticRetrieverConfig.max_tool_output_length:
+                        result = f"{result[:AgenticRetrieverConfig.max_tool_output_length]}\n... TRUNCATED, TOOL OUTPUT TOO LARGE"
 
-                    print(result[:100])
+                    if tc.function.name == "finish":
+                        answer_ids = result[:top_k]
+                        finished = True
 
                     messages.append(
                         {
@@ -198,8 +206,17 @@ class AgenticRetriever(Retriever):
                             "content": f"Unknown tool: {tc.function.name}",
                         }
                     )
+            log_dict["steps"].append(
+                {"thought": response.message.thinking, "actions": actions}
+            )
 
-        return [], log_dict
+            if finished:
+                break
+
+        log_dict["latency"] = time.time() - start_time
+        log_dict["input_tokens"] = response.prompt_eval_count
+        log_dict["generated_tokens"] = total_eval_count
+        return answer_ids, log_dict
 
 
 driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
@@ -208,7 +225,7 @@ product - also_buy - product
 product - has_category - category
 product - has_brand - brand
 product - has_color - color"""
-QUERY = "Show me some throwing equipment from the brand DSP."
+QUERY = "I'm currently browsing for some outdoor seating for an upcoming family outing and I've been looking at the folding chairs from PICNIC TIME. I was wondering, what other products do people usually view when they are checking out these chairs?"
 
 retriever = AgenticRetriever(
     model="qwen3.8:27b",
@@ -223,5 +240,5 @@ retriever = AgenticRetriever(
     seed=7,
 )
 
-x = retriever.retrieve(query=QUERY, top_k=5, entity_type="product")
-print(x)
+answer_ids, log_dict = retriever.retrieve(query=QUERY, top_k=5, entity_type="product")
+print(answer_ids)

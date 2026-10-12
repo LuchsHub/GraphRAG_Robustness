@@ -55,37 +55,14 @@ class StructuralRetrieverConfig:
 
 class AgenticRetrieverConfig:
     system_prompt = """You are exploring a knowledge graph to find specific entities that answer complex questions.
-    Solve the task with interleaving Thought, Action, Observation steps. 
 
     The following graph schema describes which edges can exist between which node types:
     {schema}
 
-    When you are ready to finish the search, call the finish action.
-
-    Guidelines:
-    - Provide multiple options when appropriate: For queries without explicit entity mentions, aim to give users many relevant options
-    - Start broad, then narrow: Begin with global searches, then focus on specific neighborhoods
-    - Exploit seed nodes first: Try finding all entities mentioned in the query before starting neighborhood explorations
-    - Recognize dead ends: If local searches yield no relevant results over multiple steps, consider performing a new global search with different parameters
-    - Use filters strategically: Apply node_type and edge_type filters to reduce noise and focus exploration"""
-
-    vss_cypher = """MATCH (e:{label})
-    SEARCH e IN (
-        VECTOR INDEX {vector_index_name}
-        FOR {query_vector}
-        LIMIT {top_k}
-    ) SCORE AS similarityScore
-    RETURN e.id as id, labels(e) as labels, e.name as name, similarityScore"""
-
-    neighbors_cypher = """MATCH (start {{id: "{id}"}})-[r{edge_type}]->(neighbor)
-    RETURN type(r) as rel, neighbor.id as id, labels(neighbor) as labels, neighbor.name as name"""
-
-    get_docs_cypher = """MATCH (n)
-    WHERE n.id IN $node_ids
-    RETURN n.id AS id, n.document AS document"""
+    When you are ready to finish the search, call the finish action. 
+    Do not provide conversational responses, only use tool calls."""
 
     def get_tool_schemas(
-        self,
         entity_types: list[str],
         relation_types: list[str],
     ) -> list[dict]:
@@ -173,3 +150,21 @@ class AgenticRetrieverConfig:
                 },
             },
         ]
+
+    vss_cypher = """MATCH (e:{label})
+    SEARCH e IN (
+        VECTOR INDEX {vector_index_name}
+        FOR {query_vector}
+        LIMIT {top_k}
+    ) SCORE AS similarityScore
+    RETURN e.id as id, labels(e) as labels, e.name as name, similarityScore"""
+
+    neighbors_cypher = """MATCH (start {{id: "{id}"}})-[r{edge_type}]->(neighbor)
+    RETURN type(r) as rel, neighbor.id as id, labels(neighbor) as labels, neighbor.name as name"""
+
+    get_docs_cypher = """MATCH (n)
+    WHERE n.id IN $node_ids
+    RETURN n.id AS id, n.document AS document"""
+
+    max_tool_output_length = 100000
+    max_steps = 10
