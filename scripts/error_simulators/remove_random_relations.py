@@ -4,11 +4,11 @@ import os
 import random
 
 from utils import get_deduplicated_triples_from_csv
+from paths import ROOT_PATH, CONFIG_PATH
 
-CONFIG_FILE = "../../configs/config.yaml"
-BASE_GRAPH = "../../graphs/stark-amazon"
+BASE_GRAPH = ROOT_PATH / "graphs" / "stark-amazon"
 
-with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 SEEDS = config["error_simulation"]["seeds"]

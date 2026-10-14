@@ -8,10 +8,11 @@ import time
 from stark_qa import load_skb
 from ollama import embed
 
-CONFIG_FILE = "../../configs/config.yaml"
-BASE_GRAPH = "../../graphs/stark-amazon"
+from paths import ROOT_PATH, CONFIG_PATH
 
-with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+BASE_GRAPH = ROOT_PATH / "graphs" / "stark-amazon"
+
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 SELECTION_SEEDS = config["error_simulation"]["seeds"]
