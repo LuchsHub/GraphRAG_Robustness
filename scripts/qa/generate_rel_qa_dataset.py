@@ -9,8 +9,8 @@ import ollama
 from paths import ROOT_PATH, CONFIG_PATH
 
 TEMPLATES_FILE_PATH = ROOT_PATH / "configs" / "rel_templates.yaml"
-OUTPUT_FILE_PATH = ROOT_PATH / "qa_datasets" / "rel_amazon.csv"
-FAILED_GENERATIONS_FILE_PATH = ROOT_PATH / "qa_datasets" / "rel_amazon_timeouts.txt"
+OUTPUT_FILE_PATH = ROOT_PATH / "qa_datasets" / "rel-amazon.csv"
+FAILED_GENERATIONS_FILE_PATH = ROOT_PATH / "qa_datasets" / "rel-amazon_timeouts.txt"
 
 with open(TEMPLATES_FILE_PATH, "r", encoding="utf-8") as f:
     templates = yaml.safe_load(f)

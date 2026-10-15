@@ -16,9 +16,9 @@ class QueryAmbiguityCheck(BaseModel):
     decision: Literal["KEEP", "DISCARD"]
 
 
-OUTPUT_FILE_PATH = ROOT_PATH / "qa_datasets" / "text_amazon.csv"
-FAILED_GENERATIONS_FILE_PATH = ROOT_PATH / "qa_datasets" / "text_amazon_timeouts.txt"
-DISCARDED_QUERIES_FILE_PATH = ROOT_PATH / "qa_datasets" / "text_amazon_discarded.txt"
+OUTPUT_FILE_PATH = ROOT_PATH / "qa_datasets" / "text-amazon.csv"
+FAILED_GENERATIONS_FILE_PATH = ROOT_PATH / "qa_datasets" / "text-amazon_timeouts.txt"
+DISCARDED_QUERIES_FILE_PATH = ROOT_PATH / "qa_datasets" / "text-amazon_discarded.txt"
 
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
