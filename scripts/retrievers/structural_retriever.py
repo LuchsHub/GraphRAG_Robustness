@@ -1,7 +1,6 @@
 import time
 
 from ollama import generate
-from neo4j import GraphDatabase
 from pydantic import BaseModel
 
 from configs.retriever_configs import StructuralRetrieverConfig
@@ -20,15 +19,18 @@ class Entities(BaseModel):
 class StructuralRetriever(Retriever):
     def __init__(
         self,
+        standard_label: str,
         model: str,
-        entity_types: list[str],
         fulltext_index_name_appendix: str,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.entity_types = entity_types
         self.model = model
         self.fulltext_index_name_appendix = fulltext_index_name_appendix
+
+        self.entity_types = self.driver.execute_query(
+            StructuralRetrieverConfig.entity_types_cypher, general_label=standard_label
+        )[0][0]["entity_types"]
 
     def retrieve(
         self, query: str, top_k: int, answer_entity_type: str
@@ -37,6 +39,12 @@ class StructuralRetriever(Retriever):
         log_dict = {}
 
         start_time = time.time()
+
+        # vectorize query
+        query_emb = self.ollama_embedder.embed_query(
+            query,
+            options={"temperature": self.temp, "seed": self.seed},
+        )
 
         # NER with a shortened version of the PathRAG NER prompt
         mentioned_entities = self.extract_entities_from_query(query)
@@ -57,19 +65,13 @@ class StructuralRetriever(Retriever):
                 }
             )
 
-        # vectorize query
-        query_emb = self.ollama_embedder.embed_query(
-            query,
-            options={"temperature": self.temp, "seed": self.seed},
-        )
-
-        # treat query as an entity, similar to KAR
-        query_entity_id = self.find_query_entity(query_emb, answer_entity_type)
-        log_dict["query_entity_id"] = query_entity_id
-        if query_entity_id not in seeds:
+        # VSS fallback
+        if not seeds:
+            query_entity_id = self.find_query_entity(query_emb, answer_entity_type)
+            log_dict["query_entity_id"] = query_entity_id
             seeds.append((query_entity_id, answer_entity_type))
 
-        # score and group by structural score
+        # score and group by structural score, inspired by HippoRAG
         ids_by_score = self.compute_structural_scores(seeds, answer_entity_type)
 
         # break ties with vector similarity, return top_k
@@ -88,7 +90,7 @@ class StructuralRetriever(Retriever):
 
     def extract_entities_from_query(self, query: str) -> Entities:
         """Extract mentioned entities from the user query."""
-        query_gen_prompt = StructuralRetrieverConfig.ner_prompt.format(
+        ner_prompt = StructuralRetrieverConfig.ner_prompt.format(
             query=query, entity_types=self.entity_types
         )
         ner_output_schema = StructuralRetrieverConfig.get_ner_output_schema(
@@ -96,7 +98,7 @@ class StructuralRetriever(Retriever):
         )
         response = generate(
             model=self.model,
-            prompt=query_gen_prompt,
+            prompt=ner_prompt,
             options={"seed": self.seed, "temperature": self.temp},
             think=False,
             format=ner_output_schema,
@@ -217,22 +219,3 @@ class StructuralRetriever(Retriever):
                 break
 
         return entities
-
-
-driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
-retriever = StructuralRetriever(
-    model="qwen3.8:27b",
-    driver=driver,
-    entity_types=["product", "brand", "category", "color"],
-    ollama_embedder="qwen3-embedding:4b",
-    fulltext_index_name_appendix="_fulltext_index",
-    vector_index_name_appendix="_index",
-    temp=0.0,
-    seed=7,
-)
-
-q = "Show me some throwing equipment from IKEA."
-
-answer_ids, log_dict = retriever.retrieve(q, top_k=20, answer_entity_type="product")
-
-print(answer_ids, log_dict)

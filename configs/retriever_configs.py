@@ -3,6 +3,20 @@ from typing import Any
 
 from pydantic import BaseModel
 
+ENTITY_TYPES_CYPHER = """CALL db.labels() YIELD label 
+WHERE label <> $general_label
+RETURN collect(label) AS entity_types"""
+
+REL_TYPES_CYPHER = """CALL db.relationshipTypes() YIELD relationshipType
+RETURN collect(relationshipType) AS relation_types"""
+
+POSSIBLE_RELATIONS_CYPHER = """MATCH (a)-[r]-(b)
+WITH 
+    [l IN labels(a) WHERE l <> $general_label][0] AS src_type,
+    type(r) AS rel_type,
+    [l IN labels(b) WHERE l <> $general_label][0] AS dst_type
+RETURN DISTINCT src_type, rel_type, dst_type"""
+
 VECTOR_SEARCH_CYPHER = """MATCH (e:{label})
 SEARCH e IN (
     VECTOR INDEX {vector_index_name}
@@ -17,6 +31,8 @@ class VSSRetrieverConfig:
 
 
 class StructuralRetrieverConfig:
+    entity_types_cypher = ENTITY_TYPES_CYPHER
+
     ner_prompt = """Given a list of entity types, identify all entities of those types from the query.
 
     For each identified entity, extract the following information:
@@ -54,6 +70,10 @@ class StructuralRetrieverConfig:
 
 
 class AgenticRetrieverConfig:
+    entity_types_cypher = ENTITY_TYPES_CYPHER
+    relation_types_cypher = REL_TYPES_CYPHER
+    possible_relations_cypher = POSSIBLE_RELATIONS_CYPHER
+
     system_prompt = """You are exploring a knowledge graph to find specific entities that answer complex questions.
 
     The following graph schema describes which edges can exist between which node types:
@@ -63,8 +83,7 @@ class AgenticRetrieverConfig:
     Do not provide conversational responses, only use tool calls."""
 
     def get_tool_schemas(
-        entity_types: list[str],
-        relation_types: list[str],
+        entity_types: list[str], relation_types: list[str], top_k: int
     ) -> list[dict]:
         return [
             {
@@ -143,7 +162,7 @@ class AgenticRetrieverConfig:
                         "properties": {
                             "answer_ids": {
                                 "type": "array",
-                                "description": "List of node IDs as the final answers to the query",
+                                "description": f"List of node IDs (max {top_k}) as the final answers to the query",
                             },
                         },
                     },

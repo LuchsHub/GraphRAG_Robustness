@@ -1,7 +1,5 @@
 import time
 
-from neo4j import GraphDatabase
-
 from configs.retriever_configs import VSSRetrieverConfig
 from .base import Retriever
 
@@ -36,19 +34,3 @@ class VSSRetriever(Retriever):
             log_dict["scores"][answer_id] = round(record["similarityScore"], 3)
 
         return answer_ids, log_dict
-
-
-driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
-retriever = VSSRetriever(
-    driver=driver,
-    ollama_embedder="qwen3-embedding:4b",
-    vector_index_name_appendix="_index",
-    temp=0.0,
-    seed=7,
-)
-
-q = "Where can I find a handcuff case made by Gould & Goodrich?"
-
-answer_ids, log_dict = retriever.retrieve(q, top_k=20, answer_entity_type="product")
-
-print(len(answer_ids), answer_ids[:15], log_dict)

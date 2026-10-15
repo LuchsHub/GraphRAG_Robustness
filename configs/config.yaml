@@ -3,6 +3,7 @@ models:
   embed_batch_size: 32
   embed_dimensions: 2560
   qa_dataset_generation_model: "gemma4:26b" # LLM used in QA dataset generation scripts
+  retriever_llm: "qwen3.8:27b" # LLM used by structural (NER) and agentic retriever
 
   # options to ensure reproducible outputs on every call
   seed: 7
@@ -15,7 +16,10 @@ graph:
     - brand
     - category
     - color
+  standard_label: "entity"
   entity_count: 1035542
+  vector_index_name_appendix: "_index"
+  fulltext_index_name_appendix: "_fulltext_index"
 
 neo4j: 
   uri: "bolt://localhost:17687"
@@ -98,3 +102,7 @@ error_simulation:
     add_text_probability: 0.5 # probability of adding random chunks to a document
   remove_random_texts:
     drop_probability: 0.5 # probability of dropping a document
+
+eval:
+  top_k: 20
+  answer_type: "product"

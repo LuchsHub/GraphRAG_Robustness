@@ -2,7 +2,6 @@ import time
 from typing import Optional
 
 import ollama
-from neo4j import GraphDatabase
 
 from configs.retriever_configs import AgenticRetrieverConfig
 from .base import Retriever
@@ -12,20 +11,31 @@ class AgenticRetriever(Retriever):
     def __init__(
         self,
         model: str,
-        graph_schema: str,
         standard_label: str,
-        entity_types: list[str],
-        relation_types: list[str],
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.model = model
-        self.graph_schema = graph_schema
         self.standard_label = standard_label
-        self.entity_types = entity_types
-        self.relation_types = relation_types
 
         self.client = ollama.Client()
+        self.entity_types = self.driver.execute_query(
+            AgenticRetrieverConfig.entity_types_cypher, general_label=standard_label
+        )[0][0]["entity_types"]
+        self.rel_types = self.driver.execute_query(
+            AgenticRetrieverConfig.relation_types_cypher
+        )[0][0]["relation_types"]
+
+        records, _, _ = self.driver.execute_query(
+            AgenticRetrieverConfig.possible_relations_cypher,
+            general_label=standard_label,
+        )
+        schema_str = ""
+        for record in records:
+            schema_str += (
+                f"{record["src_type"]} - {record["rel_type"]} - {record["dst_type"]}\n"
+            )
+        self.graph_schema = schema_str.rstrip("\n")
 
     def global_search(
         self, search_term: str, top_k: int, node_type: Optional[str] = None
@@ -59,6 +69,7 @@ class AgenticRetriever(Retriever):
             top_k=min(10, top_k),
         )
         records, _, _ = self.driver.execute_query(vss_cypher)
+        print(len(records))
 
         nodes_str = ""
         for record in records:
@@ -72,10 +83,8 @@ class AgenticRetriever(Retriever):
         node_id: int,
         edge_type: Optional[str] = None,
     ) -> str:
-        if edge_type and edge_type not in self.relation_types:
-            return (
-                f"Invalid edge type: {edge_type}. Must be one of: {self.relation_types}"
-            )
+        if edge_type and edge_type not in self.rel_types:
+            return f"Invalid edge type: {edge_type}. Must be one of: {self.rel_types}"
 
         edge_filter = f":{edge_type}" if edge_type else ""
         neighbors_cypher = AgenticRetrieverConfig.neighbors_cypher.format(
@@ -83,6 +92,7 @@ class AgenticRetriever(Retriever):
         )
 
         records, _, _ = self.driver.execute_query(neighbors_cypher)
+        print(len(records))
 
         nodes_str = ""
         for record in records:
@@ -106,13 +116,13 @@ class AgenticRetriever(Retriever):
     def finish(self, answer_ids: list[int]) -> list[int]:
         return [int(id) for id in answer_ids]
 
-    def retrieve(self, query: str, top_k: int, entity_type: str) -> tuple[list, dict]:
+    def retrieve(self, query: str, top_k: int, answer_entity_type: str) -> tuple[list, dict]:
         answer_ids = []
         log_dict = {"steps": []}
         finished = False
 
         tool_schemas = AgenticRetrieverConfig.get_tool_schemas(
-            entity_types=self.entity_types, relation_types=self.relation_types
+            entity_types=self.entity_types, relation_types=self.rel_types, top_k=top_k
         )
 
         available_functions = {}
@@ -162,6 +172,7 @@ class AgenticRetriever(Retriever):
                 break
 
             messages.append(response.message)
+            print(response.message.thinking)
             total_eval_count += response.eval_count
 
             if not response.message.tool_calls:
@@ -175,6 +186,9 @@ class AgenticRetriever(Retriever):
 
             actions = []
             for tc in response.message.tool_calls:
+                print(
+                    f"Tool call: {tc.function.name} with arguments: {tc.function.arguments}"
+                )
                 actions.append((tc.function.name, tc.function.arguments))
 
                 if tc.function.name in available_functions:
@@ -185,6 +199,7 @@ class AgenticRetriever(Retriever):
                     except Exception as e:
                         result = f"Error: {e}"
 
+                    # prevent context explosion
                     if len(result) > AgenticRetrieverConfig.max_tool_output_length:
                         result = f"{result[:AgenticRetrieverConfig.max_tool_output_length]}\n... TRUNCATED, TOOL OUTPUT TOO LARGE"
 
@@ -217,28 +232,3 @@ class AgenticRetriever(Retriever):
         log_dict["input_tokens"] = response.prompt_eval_count
         log_dict["generated_tokens"] = total_eval_count
         return answer_ids, log_dict
-
-
-driver = GraphDatabase.driver("bolt://localhost:17687", auth=("neo4j", "X"))
-GRAPH_SCHEMA = """product - also_view - product
-product - also_buy - product
-product - has_category - category
-product - has_brand - brand
-product - has_color - color"""
-QUERY = "I'm currently browsing for some outdoor seating for an upcoming family outing and I've been looking at the folding chairs from PICNIC TIME. I was wondering, what other products do people usually view when they are checking out these chairs?"
-
-retriever = AgenticRetriever(
-    model="qwen3.8:27b",
-    driver=driver,
-    ollama_embedder="qwen3-embedding:4b",
-    vector_index_name_appendix="_index",
-    standard_label="entity",
-    entity_types=["product", "brand", "category", "color"],
-    relation_types=["also_view", "also_buy", "has_category", "has_brand", "has_color"],
-    graph_schema=GRAPH_SCHEMA,
-    temp=0.0,
-    seed=7,
-)
-
-answer_ids, log_dict = retriever.retrieve(query=QUERY, top_k=5, entity_type="product")
-print(answer_ids)
