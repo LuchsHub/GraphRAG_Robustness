@@ -151,10 +151,10 @@ class StructuralRetriever(Retriever):
     def compute_structural_scores(
         self, seeds: list[tuple[str, str]], answer_entity_type: str
     ) -> dict[float, list[str]]:
-        """Get KG entities based on their distance to seed entities."""
+        """Add scores to KG entities based on their distance to seed entities."""
         # set score = 1 for target type seeds, since they themselves might be answers
         scores = {
-            seed_id: StructuralRetrieverConfig.hop_scoring[0]
+            seed_id: 1
             for seed_id, seed_type in seeds
             if seed_type == answer_entity_type
         }
@@ -163,7 +163,8 @@ class StructuralRetriever(Retriever):
             visited = set()
             visited.add(seed_id)
 
-            for hop in range(1, len(StructuralRetrieverConfig.hop_scoring)):
+            for hop in range(1, StructuralRetrieverConfig.hops + 1):
+                score_add = 1 / (hop + 1)
                 # get all exactly-h-hop neighbors
                 neighbors_cypher_query = (
                     StructuralRetrieverConfig.h_hop_neighbors_cypher.format(
@@ -175,10 +176,7 @@ class StructuralRetriever(Retriever):
                 # add score based on HOP_SCORING
                 for neighbor in records[0]["ids"]:
                     if neighbor not in visited:
-                        scores[neighbor] = (
-                            scores.get(neighbor, 0)
-                            + StructuralRetrieverConfig.hop_scoring[hop]
-                        )
+                        scores[neighbor] = scores.get(neighbor, 0) + score_add
                         visited.add(neighbor)
 
         # group by structural score for pruning
@@ -209,7 +207,7 @@ class StructuralRetriever(Retriever):
                 entities.append(
                     {
                         "id": record["id"],
-                        "struct_score": score,
+                        "struct_score": round(score, 3),
                         "vector_sim": round(record["vector_sim"], 3),
                     }
                 )

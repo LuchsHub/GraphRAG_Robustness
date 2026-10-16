@@ -47,7 +47,7 @@ class StructuralRetrieverConfig:
     WHERE toLower(node.name) = toLower("{mention_name}")
     RETURN node.id as id"""
     vector_search_cypher = VECTOR_SEARCH_CYPHER
-    hop_scoring = [1.0, 0.5, 0.25]
+    hops = 2
     h_hop_neighbors_cypher = """MATCH (start {{id: "{id}"}})-[*{h}]->(neighbor:{answer_entity_type})
     RETURN collect(DISTINCT neighbor.id) AS ids"""
     vector_rank_cypher = """MATCH (p)
