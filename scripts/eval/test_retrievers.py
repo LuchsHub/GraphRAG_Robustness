@@ -1,4 +1,6 @@
 import csv
+import json
+import os
 import yaml
 
 from neo4j import GraphDatabase
@@ -10,9 +12,11 @@ from scripts.retrievers import (
     AgenticRetriever,
 )
 
+# configure which datasets to use
 QA_DATASETS_FOLDER_PATH = ROOT_PATH / "qa_datasets"
-QA_DATASETS = ["rel-amazon", "stark-amazon", "text-amazon"]
-RESULTS_FOLDER_PATH = ROOT_PATH / "results" / "stark-amazon"
+QA_DATASETS = ["stark-amazon", "rel-amazon", "text-amazon"]
+RESULTS_BASE_PATH = ROOT_PATH / "results" / "stark-amazon"
+os.makedirs(RESULTS_BASE_PATH, exist_ok=True)
 
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
@@ -32,6 +36,7 @@ ANSWER_TYPE = config["eval"]["answer_type"]
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
+# configure which retrievers to evaluate
 vss_retriever = VSSRetriever(
     driver=driver,
     ollama_embedder=EMBEDDER,
@@ -39,7 +44,6 @@ vss_retriever = VSSRetriever(
     temp=TEMPERATURE,
     seed=SEED,
 )
-
 structural_retriever = StructuralRetriever(
     model=LLM,
     driver=driver,
@@ -50,7 +54,6 @@ structural_retriever = StructuralRetriever(
     temp=TEMPERATURE,
     seed=SEED,
 )
-
 agentic_retriever = AgenticRetriever(
     model=LLM,
     driver=driver,
@@ -60,19 +63,47 @@ agentic_retriever = AgenticRetriever(
     temp=TEMPERATURE,
     seed=SEED,
 )
-
 retrievers = [vss_retriever, structural_retriever, agentic_retriever]
 
 for dataset in QA_DATASETS:
-    print(f"-----{dataset}-----")
-    with open(QA_DATASETS_FOLDER_PATH / f"{dataset}.csv", "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
+    print(f"----- {dataset}")
+
+    dataset_results_path = RESULTS_BASE_PATH / dataset
+    os.makedirs(dataset_results_path, exist_ok=True)
+
+    answers_writers = {}
+    log_files = {}
+    for retriever in retrievers:
+        retriever_name = retriever.__class__.__name__
+
+        answers_file_path = dataset_results_path / f"{retriever_name}.csv"
+        answers_file = open(answers_file_path, "w", newline="", encoding="utf-8")
+
+        writer = csv.writer(answers_file)
+        writer.writerow(["query_id", "retrieved_ids"])
+        answers_writers[retriever_name] = writer
+
+        log_file_path = dataset_results_path / f"{retriever_name}_log.json"
+        log_files[retriever_name] = open(log_file_path, "w", encoding="utf-8")
+
+    with open(
+        QA_DATASETS_FOLDER_PATH / f"{dataset}.csv", "r", encoding="utf-8"
+    ) as dataset_file:
+        reader = csv.DictReader(dataset_file)
         for row in reader:
             query = row["query"]
-            answer_ids = row["answer_ids"]
-            print(f"---{query}---")
-            print(answer_ids)
+            query_id = row["id"]
+            print(f"--- {query_id} {query}")
+
             for retriever in retrievers:
-                print(f"-{retriever.__class__.__name__}-")
-                retrieved_ids, log_dict = retriever.retrieve(query, top_k=TOP_K, answer_entity_type=ANSWER_TYPE)
+                retriever_name = retriever.__class__.__name__
+                print(f"- {retriever_name}")
+                retrieved_ids, log_dict = retriever.retrieve(
+                    query, top_k=TOP_K, answer_entity_type=ANSWER_TYPE
+                )
                 print(retrieved_ids)
+
+                answers_writers[retriever_name].writerow([query_id, retrieved_ids])
+
+                log_dict["id"] = query_id
+                json.dump(log_dict, log_files[retriever_name], indent=4)
