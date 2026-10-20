@@ -71,20 +71,37 @@ for dataset in QA_DATASETS:
     dataset_results_path = RESULTS_BASE_PATH / dataset
     os.makedirs(dataset_results_path, exist_ok=True)
 
+    answers_files = {}
     answers_writers = {}
-    log_files = {}
+    completed_ids = {}
     for retriever in retrievers:
         retriever_name = retriever.__class__.__name__
 
         answers_file_path = dataset_results_path / f"{retriever_name}.csv"
-        answers_file = open(answers_file_path, "w", newline="", encoding="utf-8")
 
+        completed_ids[retriever_name] = set()
+        if os.path.exists(answers_file_path):
+            with open(answers_file_path, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                next(reader, None)
+                for line in reader:
+                    if line:
+                        completed_ids[retriever_name].add(int(line[0]))
+        
+        answers_file = open(answers_file_path, "a", newline="", encoding="utf-8")
         writer = csv.writer(answers_file)
-        writer.writerow(["query_id", "retrieved_ids"])
+
+        file_already_existed = (
+            os.path.exists(answers_file_path) and os.path.getsize(answers_file_path) > 0
+        )
+        if not file_already_existed:
+            writer.writerow(["query_id", "retrieved_ids"])
+            answers_file.flush()
+
+        answers_files[retriever_name] = answers_file
         answers_writers[retriever_name] = writer
 
-        log_file_path = dataset_results_path / f"{retriever_name}_log.json"
-        log_files[retriever_name] = open(log_file_path, "w", encoding="utf-8")
+        os.makedirs(dataset_results_path / f"{retriever_name}_logs", exist_ok=True)
 
     with open(
         QA_DATASETS_FOLDER_PATH / f"{dataset}.csv", "r", encoding="utf-8"
@@ -97,15 +114,26 @@ for dataset in QA_DATASETS:
 
             for retriever in retrievers:
                 retriever_name = retriever.__class__.__name__
+
+                if query_id in completed_ids[retriever_name]:
+                    continue
+
                 print(f"- {retriever_name}")
                 start_time = time.time()
                 retrieved_ids, log_dict = retriever.retrieve(
                     query, top_k=TOP_K, answer_entity_type=ANSWER_TYPE
                 )
                 log_dict["latency"] = round(time.time() - start_time, 3)
+                log_dict["id"] = query_id
                 print(retrieved_ids)
 
                 answers_writers[retriever_name].writerow([query_id, retrieved_ids])
+                answers_files[retriever_name].flush()
 
-                log_dict["id"] = query_id
-                json.dump(log_dict, log_files[retriever_name], indent=4)
+                log_path = (
+                    dataset_results_path / f"{retriever_name}_logs" / f"{query_id}.json"
+                )
+                with open(log_path, "w", encoding="utf-8") as f:
+                    json.dump(log_dict, f, indent=4)
+
+                completed_ids[retriever_name].add(query_id)
