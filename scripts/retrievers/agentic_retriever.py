@@ -177,7 +177,7 @@ class AgenticRetriever(Retriever):
             if not response.message.tool_calls:
                 messages.append(
                     {
-                        "role": "user",
+                        "role": "system",
                         "content": "No tool calls made. If you want to give the final answer, call the finish action.",
                     }
                 )
