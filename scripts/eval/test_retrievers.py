@@ -92,7 +92,7 @@ for dataset in QA_DATASETS:
         reader = csv.DictReader(dataset_file)
         for row in reader:
             query = row["query"]
-            query_id = row["id"]
+            query_id = int(row["id"])
             print(f"--- {query_id} {query}")
 
             for retriever in retrievers:

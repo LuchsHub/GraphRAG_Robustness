@@ -54,7 +54,7 @@ class StructuralRetriever(Retriever):
                 {
                     "mention_name": entity.name,
                     "mention_type": entity.type,
-                    "linked_id": id,
+                    "linked_id": int(id),
                     "used_vss": used_vss,
                 }
             )
@@ -62,7 +62,7 @@ class StructuralRetriever(Retriever):
         # VSS fallback
         if not seeds:
             query_entity_id = self.find_query_entity(query_emb, answer_entity_type)
-            log_dict["query_entity_id"] = query_entity_id
+            log_dict["query_entity_id"] = int(query_entity_id)
             seeds.append((query_entity_id, answer_entity_type))
 
         # score and group by structural score, inspired by HippoRAG
