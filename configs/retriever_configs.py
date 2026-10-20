@@ -20,10 +20,10 @@ RETURN DISTINCT src_type, rel_type, dst_type"""
 VECTOR_SEARCH_CYPHER = """MATCH (e:{label})
 SEARCH e IN (
     VECTOR INDEX {vector_index_name}
-    FOR {query_vector}
-    LIMIT {top_k}
+    FOR $query_vector
+    LIMIT $top_k
 ) SCORE AS similarityScore
-RETURN e.id as id, similarityScore"""
+RETURN e.id AS id, similarityScore"""
 
 
 class VSSRetrieverConfig:
@@ -42,13 +42,13 @@ class StructuralRetrieverConfig:
     Query: {query}
 
     Output: """
-    fulltext_search_cypher = """CALL db.index.fulltext.queryNodes("{fulltext_index_name}", "'{mention_name}'") 
-    YIELD node
-    WHERE toLower(node.name) = toLower("{mention_name}")
-    RETURN node.id as id"""
+    exact_match_cypher = """MATCH (node:{label})
+    WHERE toLower(node.name) = toLower($name)
+    RETURN node.id AS id
+    LIMIT 1"""
     vector_search_cypher = VECTOR_SEARCH_CYPHER
     hops = 2
-    h_hop_neighbors_cypher = """MATCH (start {{id: "{id}"}})-[*{h}]->(neighbor:{answer_entity_type})
+    h_hop_neighbors_cypher = """MATCH (start {{id: $id}})-[*{h}]->(neighbor:{answer_entity_type})
     RETURN collect(DISTINCT neighbor.id) AS ids"""
     vector_rank_cypher = """MATCH (p)
     WHERE p.id IN $ids
@@ -173,12 +173,12 @@ class AgenticRetrieverConfig:
     vss_cypher = """MATCH (e:{label})
     SEARCH e IN (
         VECTOR INDEX {vector_index_name}
-        FOR {query_vector}
-        LIMIT {top_k}
+        FOR $query_vector
+        LIMIT $top_k
     ) SCORE AS similarityScore
     RETURN e.id as id, labels(e) as labels, e.name as name, similarityScore"""
 
-    neighbors_cypher = """MATCH (start {{id: "{id}"}})-[r{edge_type}]->(neighbor)
+    neighbors_cypher = """MATCH (start {{id: $id}})-[r{edge_type}]->(neighbor)
     RETURN type(r) as rel, neighbor.id as id, labels(neighbor) as labels, neighbor.name as name"""
 
     get_docs_cypher = """MATCH (n)

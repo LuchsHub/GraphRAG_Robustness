@@ -1,5 +1,3 @@
-import time
-
 from ollama import generate
 from pydantic import BaseModel
 
@@ -21,12 +19,10 @@ class StructuralRetriever(Retriever):
         self,
         standard_label: str,
         model: str,
-        fulltext_index_name_appendix: str,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.model = model
-        self.fulltext_index_name_appendix = fulltext_index_name_appendix
 
         self.entity_types = self.driver.execute_query(
             StructuralRetrieverConfig.entity_types_cypher, general_label=standard_label
@@ -37,8 +33,6 @@ class StructuralRetriever(Retriever):
     ) -> tuple[list, dict]:
         answer_ids = []
         log_dict = {}
-
-        start_time = time.time()
 
         # vectorize query
         query_emb = self.ollama_embedder.embed_query(
@@ -77,9 +71,6 @@ class StructuralRetriever(Retriever):
         # break ties with vector similarity, return top_k
         ranked_entities = self.rank_by_vector_similarity(ids_by_score, query_emb, top_k)
 
-        latency = time.time() - start_time
-        log_dict["latency"] = round(latency, 3)
-
         answer_ids = [entity["id"] for entity in ranked_entities]
         log_dict["scores"] = {
             entity["id"]: (entity["struct_score"], entity["vector_sim"])
@@ -110,11 +101,10 @@ class StructuralRetriever(Retriever):
         """Link an entity to the knowledge graph through exact-match name search, alternatively through document-based VSS."""
 
         # try case-insensitive exact-matching
-        fulltext_index_name = f"{entity.type}{self.fulltext_index_name_appendix}"
-        text_search_cypher = StructuralRetrieverConfig.fulltext_search_cypher.format(
-            fulltext_index_name=fulltext_index_name, mention_name=entity.name
+        exact_match_cypher = StructuralRetrieverConfig.exact_match_cypher.format(
+            label=entity.type
         )
-        records, _, _ = self.driver.execute_query(text_search_cypher)
+        records, _, _ = self.driver.execute_query(exact_match_cypher, name=entity.name)
         if records:
             return records[0]["id"], False
 
@@ -129,11 +119,11 @@ class StructuralRetriever(Retriever):
                 StructuralRetrieverConfig.vector_search_cypher.format(
                     label=entity.type,
                     vector_index_name=vector_index_name,
-                    query_vector=entity_emb,
-                    top_k=5,
                 )
             )
-            records, _, _ = self.driver.execute_query(vector_search_cypher)
+            records, _, _ = self.driver.execute_query(
+                vector_search_cypher, query_vector=entity_emb, top_k=5
+            )
             return records[0]["id"], True
 
     def find_query_entity(self, query_emb: list[float], answer_entity_type: str) -> str:
@@ -142,10 +132,10 @@ class StructuralRetriever(Retriever):
         vector_search_cypher = StructuralRetrieverConfig.vector_search_cypher.format(
             label=answer_entity_type,
             vector_index_name=vector_index_name,
-            query_vector=query_emb,
-            top_k=5,
         )
-        records, _, _ = self.driver.execute_query(vector_search_cypher)
+        records, _, _ = self.driver.execute_query(
+            vector_search_cypher, query_vector=query_emb, top_k=5
+        )
         return records[0]["id"]
 
     def compute_structural_scores(
@@ -168,10 +158,12 @@ class StructuralRetriever(Retriever):
                 # get all exactly-h-hop neighbors
                 neighbors_cypher_query = (
                     StructuralRetrieverConfig.h_hop_neighbors_cypher.format(
-                        id=seed_id, h=hop, answer_entity_type=answer_entity_type
+                        h=hop, answer_entity_type=answer_entity_type
                     )
                 )
-                records, _, _ = self.driver.execute_query(neighbors_cypher_query)
+                records, _, _ = self.driver.execute_query(
+                    neighbors_cypher_query, id=seed_id
+                )
 
                 # add score based on HOP_SCORING
                 for neighbor in records[0]["ids"]:

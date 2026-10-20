@@ -1,4 +1,3 @@
-import time
 from typing import Optional
 
 import ollama
@@ -65,11 +64,12 @@ class AgenticRetriever(Retriever):
         vss_cypher = AgenticRetrieverConfig.vss_cypher.format(
             label=label,
             vector_index_name=vector_index_name,
+        )
+        records, _, _ = self.driver.execute_query(
+            vss_cypher,
             query_vector=query_emb,
             top_k=min(10, top_k),
         )
-        records, _, _ = self.driver.execute_query(vss_cypher)
-        print(len(records))
 
         nodes_str = ""
         for record in records:
@@ -88,11 +88,10 @@ class AgenticRetriever(Retriever):
 
         edge_filter = f":{edge_type}" if edge_type else ""
         neighbors_cypher = AgenticRetrieverConfig.neighbors_cypher.format(
-            id=node_id, edge_type=edge_filter
+            edge_type=edge_filter
         )
 
-        records, _, _ = self.driver.execute_query(neighbors_cypher)
-        print(len(records))
+        records, _, _ = self.driver.execute_query(neighbors_cypher, id=node_id)
 
         nodes_str = ""
         for record in records:
@@ -146,8 +145,6 @@ class AgenticRetriever(Retriever):
             },
         ]
 
-        start_time = time.time()
-
         step = 0
         total_eval_count = 0
         while step < AgenticRetrieverConfig.max_steps:
@@ -174,7 +171,6 @@ class AgenticRetriever(Retriever):
                 break
 
             messages.append(response.message)
-            print(response.message.thinking)
             total_eval_count += response.eval_count
 
             if not response.message.tool_calls:
@@ -188,9 +184,6 @@ class AgenticRetriever(Retriever):
 
             actions = []
             for tc in response.message.tool_calls:
-                print(
-                    f"Tool call: {tc.function.name} with arguments: {tc.function.arguments}"
-                )
                 actions.append((tc.function.name, tc.function.arguments))
 
                 if tc.function.name in available_functions:
@@ -230,7 +223,6 @@ class AgenticRetriever(Retriever):
             if finished:
                 break
 
-        log_dict["latency"] = time.time() - start_time
         log_dict["input_tokens"] = response.prompt_eval_count
         log_dict["generated_tokens"] = total_eval_count
         return answer_ids, log_dict

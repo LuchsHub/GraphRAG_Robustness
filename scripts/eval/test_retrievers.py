@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import time
 import yaml
 
 from neo4j import GraphDatabase
@@ -49,7 +50,6 @@ structural_retriever = StructuralRetriever(
     driver=driver,
     standard_label=STANDARD_LABEL,
     ollama_embedder=EMBEDDER,
-    fulltext_index_name_appendix=FULLTEXT_INDEX_NAME_APPENDIX,
     vector_index_name_appendix=VECTOR_INDEX_NAME_APPENDIX,
     temp=TEMPERATURE,
     seed=SEED,
@@ -98,9 +98,11 @@ for dataset in QA_DATASETS:
             for retriever in retrievers:
                 retriever_name = retriever.__class__.__name__
                 print(f"- {retriever_name}")
+                start_time = time.time()
                 retrieved_ids, log_dict = retriever.retrieve(
                     query, top_k=TOP_K, answer_entity_type=ANSWER_TYPE
                 )
+                log_dict["latency"] = round(time.time() - start_time, 3)
                 print(retrieved_ids)
 
                 answers_writers[retriever_name].writerow([query_id, retrieved_ids])

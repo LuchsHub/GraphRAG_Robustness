@@ -1,5 +1,3 @@
-import time
-
 from configs.retriever_configs import VSSRetrieverConfig
 from .base import Retriever
 
@@ -11,7 +9,6 @@ class VSSRetriever(Retriever):
         answer_ids = []
         log_dict = {}
 
-        start_time = time.time()
         query_vector = self.ollama_embedder.embed_query(
             query,
             options={"temperature": self.temp, "seed": self.seed},
@@ -20,12 +17,10 @@ class VSSRetriever(Retriever):
         vector_search_cypher = VSSRetrieverConfig.vector_search_cypher.format(
             label=answer_entity_type,
             vector_index_name=vector_index_name,
-            query_vector=query_vector,
-            top_k=top_k,
         )
-        records, _, _ = self.driver.execute_query(vector_search_cypher)
-        latency = time.time() - start_time
-        log_dict["latency"] = round(latency, 3)
+        records, _, _ = self.driver.execute_query(
+            vector_search_cypher, query_vector=query_vector, top_k=top_k
+        )
 
         log_dict["scores"] = {}
         for record in records:
