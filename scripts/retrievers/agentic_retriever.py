@@ -116,7 +116,9 @@ class AgenticRetriever(Retriever):
     def finish(self, answer_ids: list[int]) -> list[int]:
         return [int(id) for id in answer_ids]
 
-    def retrieve(self, query: str, top_k: int, answer_entity_type: str) -> tuple[list, dict]:
+    def retrieve(
+        self, query: str, top_k: int, answer_entity_type: str
+    ) -> tuple[list, dict]:
         answer_ids = []
         log_dict = {"steps": []}
         finished = False
