@@ -206,7 +206,7 @@ class StructuralRetriever(Retriever):
             for record in records:
                 entities.append(
                     {
-                        "id": record["id"],
+                        "id": int(record["id"]),
                         "struct_score": round(score, 3),
                         "vector_sim": round(record["vector_sim"], 3),
                     }
