@@ -186,4 +186,4 @@ class AgenticRetrieverConfig:
     RETURN n.id AS id, n.document AS document"""
 
     max_tool_output_length = 100000
-    max_steps = 10
+    max_steps = 25
