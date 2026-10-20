@@ -70,6 +70,7 @@ class AgenticRetriever(Retriever):
             query_vector=query_emb,
             top_k=min(10, top_k),
         )
+        print(len(records))
 
         nodes_str = ""
         for record in records:
@@ -92,6 +93,7 @@ class AgenticRetriever(Retriever):
         )
 
         records, _, _ = self.driver.execute_query(neighbors_cypher, id=node_id)
+        print(len(records))
 
         nodes_str = ""
         for record in records:
@@ -150,6 +152,7 @@ class AgenticRetriever(Retriever):
         total_eval_count = 0
         while step < AgenticRetrieverConfig.max_steps:
             step += 1
+            print(step)
 
             if step == AgenticRetrieverConfig.max_steps:
                 messages.append(
@@ -165,12 +168,13 @@ class AgenticRetriever(Retriever):
                     messages=messages,
                     think="high",
                     tools=tool_schemas,
-                    options={"temperature": self.temp, "seed": self.seed},
+                    options={"temperature": self.temp, "seed": self.seed, "num_predict": 4096},
                 )
             except Exception as e:
                 log_dict["generation_error"] = str(e)
                 break
 
+            print(response.message.thinking)
             messages.append(response.message)
             total_eval_count += response.eval_count
 
@@ -185,6 +189,7 @@ class AgenticRetriever(Retriever):
 
             step_actions = []
             for tc in response.message.tool_calls:
+                print(f"Tool call: {tc.function.name} with arguments {tc.function.arguments}")
                 if (tc.function.name, tc.function.arguments) in all_actions:
                     messages.append(
                         {
