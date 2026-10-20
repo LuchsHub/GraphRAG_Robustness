@@ -145,6 +145,7 @@ class AgenticRetriever(Retriever):
             },
         ]
 
+        all_actions = []
         step = 0
         total_eval_count = 0
         while step < AgenticRetrieverConfig.max_steps:
@@ -176,15 +177,25 @@ class AgenticRetriever(Retriever):
             if not response.message.tool_calls:
                 messages.append(
                     {
-                        "role": "tool",
+                        "role": "user",
                         "content": "No tool calls made. If you want to give the final answer, call the finish action.",
                     }
                 )
                 continue
 
-            actions = []
+            step_actions = []
             for tc in response.message.tool_calls:
-                actions.append((tc.function.name, tc.function.arguments))
+                if (tc.function.name, tc.function.arguments) in all_actions:
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_name": tc.function.name,
+                            "content": f"Duplicate tool call",
+                        }
+                    )
+                    continue
+                step_actions.append((tc.function.name, tc.function.arguments))
+                all_actions.append((tc.function.name, tc.function.arguments))
 
                 if tc.function.name in available_functions:
                     try:
@@ -213,11 +224,12 @@ class AgenticRetriever(Retriever):
                     messages.append(
                         {
                             "role": "tool",
-                            "content": f"Unknown tool: {tc.function.name}",
+                            "tool_name": tc.function.name,
+                            "content": f"Unknown tool",
                         }
                     )
             log_dict["steps"].append(
-                {"thought": response.message.thinking, "actions": actions}
+                {"thought": response.message.thinking, "actions": step_actions}
             )
 
             if finished:
