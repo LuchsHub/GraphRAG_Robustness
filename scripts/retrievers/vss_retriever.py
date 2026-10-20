@@ -29,7 +29,7 @@ class VSSRetriever(Retriever):
 
         log_dict["scores"] = {}
         for record in records:
-            answer_id = record["id"]
+            answer_id = int(record["id"])
             answer_ids.append(answer_id)
             log_dict["scores"][answer_id] = round(record["similarityScore"], 3)
 
