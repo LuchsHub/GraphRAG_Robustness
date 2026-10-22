@@ -16,7 +16,7 @@ from scripts.retrievers import (
 # configure which datasets to use
 QA_DATASETS_FOLDER_PATH = ROOT_PATH / "qa_datasets"
 QA_DATASETS = ["stark-amazon", "rel-amazon", "text-amazon"]
-RESULTS_BASE_PATH = ROOT_PATH / "results" / "stark-amazon"
+RESULTS_BASE_PATH = ROOT_PATH / "results" / "stark-amazon" # replace with graph name
 os.makedirs(RESULTS_BASE_PATH, exist_ok=True)
 
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:

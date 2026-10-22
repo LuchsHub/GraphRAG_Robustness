@@ -92,7 +92,7 @@ class AgenticRetriever(Retriever):
             edge_type=edge_filter
         )
 
-        records, _, _ = self.driver.execute_query(neighbors_cypher, id=node_id)
+        records, _, _ = self.driver.execute_query(neighbors_cypher, id=str(node_id))
         print(len(records))
 
         nodes_str = ""
