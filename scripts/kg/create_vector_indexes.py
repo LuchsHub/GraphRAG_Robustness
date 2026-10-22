@@ -26,8 +26,3 @@ for label in LABELS:
           }}
         }}
     """)
-
-    driver.execute_query(f"""
-      CREATE FULLTEXT INDEX {label}_fulltext_index IF NOT EXISTS
-      FOR (e:{label}) ON EACH [e.name]
-    """)
