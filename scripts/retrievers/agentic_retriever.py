@@ -215,8 +215,11 @@ class AgenticRetriever(Retriever):
                         result = f"{result[:AgenticRetrieverConfig.max_tool_output_length]}\n... TRUNCATED, TOOL OUTPUT TOO LARGE"
 
                     if tc.function.name == "finish":
-                        answer_ids = result[:top_k]
                         finished = True
+
+                        # handle cases where result is an error string in finish step
+                        if isinstance(answer_ids, list):
+                            answer_ids = result[:top_k]
 
                     messages.append(
                         {
