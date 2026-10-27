@@ -1,0 +1,70 @@
+{
+    "steps": [
+        {
+            "thought": "The user is asking for a map created by the US Forest Service. Let me search for this in the knowledge graph.",
+            "actions": [
+                [
+                    "global_search",
+                    {
+                        "search_term": "map US Forest Service",
+                        "top_k": 10
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found the U.S. Forest Service node (id: 1022472). Let me look at its neighbors to find maps created by the US Forest Service.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": 1022472
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I can see that the U.S. Forest Service (id: 1022472) has a \"has_brand\" relationship with \"Trinity Alps Wilderness Area Map - Waterproof\" (id: 78). This seems to be a map created by the US Forest Service. Let me also check the other maps that came up in the search - the Coconino National Forest Map and Pike National Forest Map. Let me check their brands.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": 78,
+                        "edge_type": "has_brand"
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "node_id": 76,
+                        "edge_type": "has_brand"
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "node_id": 73,
+                        "edge_type": "has_brand"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "So I found:\n- \"Trinity Alps Wilderness Area Map - Waterproof\" (id: 78) - brand: U.S. Forest Service (id: 1022472)\n- \"Coconino National Forest Map - Waterproof\" (id: 76) - brand: USDA Forest Service (id: 1022864)\n- \"Pike National Forest Map - Waterproof\" (id: 73) - brand: Unknown\n\nThe most direct match is the \"Trinity Alps Wilderness Area Map - Waterproof\" (id: 78) which is directly branded by \"U.S. Forest Service\". Let me also check if the USDA Forest Service is related to U.S. Forest Service.\n\nActually, the user asked for a map created by the US Forest Service. The \"Trinity Alps Wilderness Area Map - Waterproof\" (id: 78) is directly associated with the U.S. Forest Service brand. This is the best answer.",
+            "actions": [
+                [
+                    "finish",
+                    {
+                        "answer_ids": [
+                            78
+                        ]
+                    }
+                ]
+            ]
+        }
+    ],
+    "input_tokens": 2193,
+    "generated_tokens": 603,
+    "latency": 7.015,
+    "id": 2
+}

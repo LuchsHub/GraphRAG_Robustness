@@ -1,0 +1,72 @@
+{
+    "steps": [
+        {
+            "thought": "The user is looking for a reliable fuel tank from Dubro Products. Let me search for this in the knowledge graph.",
+            "actions": [
+                [
+                    "global_search",
+                    {
+                        "search_term": "Dubro Products fuel tank",
+                        "top_k": 10
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found a Du-Bro 404 4 oz Fuel Tank (id: 6116) and the Dubro Products brand (id: 975047). Let me check if the fuel tank is associated with the Dubro Products brand, and also look for other fuel tanks from this brand.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": 6116,
+                        "edge_type": "has_brand"
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "node_id": 975047,
+                        "edge_type": "has_brand"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "The Du-Bro 404 4 oz Fuel Tank (id: 6116) is indeed a product of Dubro Products (id: 975047). Let me get more details about this product and also check if there are other fuel tanks from this brand.",
+            "actions": [
+                [
+                    "get_documents",
+                    {
+                        "node_ids": [
+                            6116
+                        ]
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "edge_type": "also_buy",
+                        "node_id": 6116
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found the Du-Bro 404 4 oz Fuel Tank from Dubro Products. It has great reviews and is designed to be tough. Let me provide this as the answer.",
+            "actions": [
+                [
+                    "finish",
+                    {
+                        "answer_ids": [
+                            6116
+                        ]
+                    }
+                ]
+            ]
+        }
+    ],
+    "input_tokens": 2381,
+    "generated_tokens": 443,
+    "latency": 5.98,
+    "id": 419
+}
