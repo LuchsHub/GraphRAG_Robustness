@@ -1,0 +1,80 @@
+{
+    "steps": [
+        {
+            "thought": "The user is asking about a detailed M1 Carbine manual with lots of visuals for maintenance and specific specifications. Let me search the knowledge graph for this.",
+            "actions": [
+                [
+                    "global_search",
+                    {
+                        "search_term": "M1 Carbine manual maintenance specifications",
+                        "top_k": 10
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "The search didn't return a specific M1 Carbine manual. Let me try a more specific search.",
+            "actions": [
+                [
+                    "global_search",
+                    {
+                        "search_term": "M1 Carbine manual",
+                        "top_k": 10
+                    }
+                ],
+                [
+                    "global_search",
+                    {
+                        "search_term": "M1 Carbine technical manual maintenance",
+                        "top_k": 10,
+                        "node_type": "product"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found two very relevant results:\n- id: 113328 - \"The U.S. .30 Caliber Gas Operated Carbines: A Shop Manual\"\n- id: 7926 - \"M-1 Carbine Manual\"\n\nLet me get more details on both of these, and also look at their neighbors to understand what they are.",
+            "actions": [
+                [
+                    "get_documents",
+                    {
+                        "node_ids": [
+                            113328,
+                            7926
+                        ]
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "node_id": 113328
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "node_id": 7926
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "Based on the search results, I found two relevant manuals:\n\n1. **id: 7926 - \"M-1 Carbine Manual\"** - This is the Army/Air Force manual TM9-1276 with 178 pages covering inspection, cleaning, disassembly/assembly, repair and rebuilding. Fully illustrated. Brand: US Gov't.\n\n2. **id: 113328 - \"The U.S. .30 Caliber Gas Operated Carbines: A Shop Manual\"** - By Jerry Kuhnhausen. This is described as \"The ultimate tech data manual for all U.S. .30 M1 Carbines and commercial .30 M1 Carbines with U.S. military parts. 100's of crystal clear photos and illustrations. \n\nThe second manual goes deeper with 224 pages covering design theory, operating principles, bench function checks, complete disassembly and reassembly procedures, parts inspection data with dimensional specifications, ordnance steels and hardness requirements, inspection gauges, parts fit, repair and restoration work, troubleshooting, and accuracy improvements. Given the user's request for a detailed manual with extensive visuals for maintenance and specific specifications, the Kuhnhausen shop manual is clearly the better fit.",
+            "actions": [
+                [
+                    "finish",
+                    {
+                        "answer_ids": [
+                            113328,
+                            7926
+                        ]
+                    }
+                ]
+            ]
+        }
+    ],
+    "input_tokens": 5900,
+    "generated_tokens": 695,
+    "latency": 9.28,
+    "id": 545
+}
