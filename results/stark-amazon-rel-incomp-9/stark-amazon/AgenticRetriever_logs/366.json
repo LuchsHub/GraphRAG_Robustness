@@ -1,0 +1,99 @@
+{
+    "steps": [
+        {
+            "thought": "The user is asking for fishing baits from the brand \"Mikes\". Let me search for this brand and related products.",
+            "actions": [
+                [
+                    "global_search",
+                    {
+                        "search_term": "Mikes fishing bait",
+                        "top_k": 10
+                    }
+                ],
+                [
+                    "global_search",
+                    {
+                        "search_term": "Mikes",
+                        "node_type": "brand",
+                        "top_k": 10
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found the brand \"Mikes\" with ID 997711. Now let me look at the products associated with this brand.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": 997711,
+                        "edge_type": "has_brand"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found one product from the brand \"Mikes\": \"Mikes 1014 Shrimp Eggs\" (ID 5312). Let me also check if there are any related products via also_buy or also_view edges, and get the documents for this product.",
+            "actions": [
+                [
+                    "get_documents",
+                    {
+                        "node_ids": [
+                            5312
+                        ]
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "node_id": 5312,
+                        "edge_type": "also_buy"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found the product \"Mikes 1014 Shrimp Eggs\" from the brand \"Mikes\". There are also related products that people also buy. Let me check if those related products are also from the Mikes brand or from a different brand (like \"Atlas Mike's\" or \"Mike's\"). Let me check their brands.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "edge_type": "has_brand",
+                        "node_id": 17993
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "edge_type": "has_brand",
+                        "node_id": 363504
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "edge_type": "has_brand",
+                        "node_id": 5225
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "So the only product directly from the brand \"Mikes\" (ID 997711) is \"Mikes 1014 Shrimp Eggs\" (ID 5312). The other products are from \"Atlas Mike's\" which is a different brand. Let me provide the answer with the product from the Mikes brand.",
+            "actions": [
+                [
+                    "finish",
+                    {
+                        "answer_ids": [
+                            5312
+                        ]
+                    }
+                ]
+            ]
+        }
+    ],
+    "input_tokens": 2538,
+    "generated_tokens": 649,
+    "latency": 7.55,
+    "id": 366
+}

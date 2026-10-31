@@ -1,0 +1,124 @@
+{
+    "steps": [
+        {
+            "thought": "The user is asking for a map created by the US Forest Service. Let me search for this in the knowledge graph.",
+            "actions": [
+                [
+                    "global_search",
+                    {
+                        "search_term": "map US Forest Service",
+                        "top_k": 10
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found a node for \"U.S. Forest Service\" (id: 1022472). Let me explore its neighbors to find maps created by the US Forest Service.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": 1022472
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "The local search didn't return any results. Let me try a different approach - maybe search for \"US Forest Service map\" as a product.",
+            "actions": [
+                [
+                    "global_search",
+                    {
+                        "search_term": "US Forest Service map product",
+                        "top_k": 10,
+                        "node_type": "product"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I see several National Forest maps. Let me check if any of these are specifically created by the US Forest Service. Let me look at the neighbors of the \"U.S. Forest Service\" node (id: 1022472) to see what products are associated with it.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": 1022472,
+                        "edge_type": "has_brand"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "Let me try a different approach. Let me look at the neighbors of the U.S. Forest Service node without specifying an edge type.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": "1.022472e+06",
+                        "edge_type": "also_buy"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "Let me try to look at the Coconino National Forest Map and other National Forest maps to see if they are associated with the US Forest Service brand.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": 76,
+                        "edge_type": "has_brand"
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "node_id": 73,
+                        "edge_type": "has_brand"
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "node_id": 75,
+                        "edge_type": "has_brand"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "The Coconino National Forest Map (id: 76) has the brand \"USDA Forest Service\" (id: 1022864). Let me also check the other maps. Let me also look at the Pike National Forest Map and Plumas National Forest Map.",
+            "actions": []
+        },
+        {
+            "thought": "Let me check the documents for the Coconino National Forest Map to confirm it's created by the US Forest Service.",
+            "actions": [
+                [
+                    "get_documents",
+                    {
+                        "node_ids": [
+                            76
+                        ]
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "The Coconino National Forest Map (id: 76) is created by the USDA Forest Service. This is a map created by the US Forest Service. Let me provide this as the answer.",
+            "actions": [
+                [
+                    "finish",
+                    {
+                        "answer_ids": [
+                            76
+                        ]
+                    }
+                ]
+            ]
+        }
+    ],
+    "input_tokens": 2732,
+    "generated_tokens": 855,
+    "latency": 10.361,
+    "id": 2
+}
