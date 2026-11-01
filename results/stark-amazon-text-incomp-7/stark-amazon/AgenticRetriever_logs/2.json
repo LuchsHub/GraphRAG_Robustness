@@ -1,0 +1,67 @@
+{
+    "steps": [
+        {
+            "thought": "The user is asking for a map created by the US Forest Service. Let me search for this in the knowledge graph.",
+            "actions": [
+                [
+                    "global_search",
+                    {
+                        "search_term": "map US Forest Service",
+                        "top_k": 10
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found some results. Let me check the brand of the top results to see which ones are created by the US Forest Service. Let me look at the local search for the top results to find their brands.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": 75,
+                        "edge_type": "has_brand"
+                    }
+                ],
+                [
+                    "local_search",
+                    {
+                        "node_id": 76,
+                        "edge_type": "has_brand"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "Both maps are created by the US Forest Service (or USDA Forest Service). Let me get more details about these products to provide a good recommendation.",
+            "actions": [
+                [
+                    "get_documents",
+                    {
+                        "node_ids": [
+                            75,
+                            76
+                        ]
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "The documents are empty, but I have enough information. Both maps are created by the US Forest Service. Let me recommend them.",
+            "actions": [
+                [
+                    "finish",
+                    {
+                        "answer_ids": [
+                            75,
+                            76
+                        ]
+                    }
+                ]
+            ]
+        }
+    ],
+    "input_tokens": 1469,
+    "generated_tokens": 325,
+    "latency": 4.694,
+    "id": 2
+}
