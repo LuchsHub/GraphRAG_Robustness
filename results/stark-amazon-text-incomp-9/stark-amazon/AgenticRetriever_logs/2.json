@@ -1,0 +1,76 @@
+{
+    "steps": [
+        {
+            "thought": "The user is asking for a map created by the US Forest Service. Let me search for this in the knowledge graph.",
+            "actions": [
+                [
+                    "global_search",
+                    {
+                        "search_term": "map US Forest Service",
+                        "top_k": 10
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found a node for \"U.S. Forest Service\" (id: 1022472). Let me look at its neighbors to find maps created by the US Forest Service.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": 1022472,
+                        "edge_type": "has_brand"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found a product associated with the U.S. Forest Service brand: \"Trinity Alps Wilderness Area Map - Waterproof\" (id: 78). Let me also check if there are other products associated with this brand.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "node_id": "1.022472e+06"
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "The local search without edge type didn't return results. Let me try other edge types to see if there are more products.",
+            "actions": [
+                [
+                    "local_search",
+                    {
+                        "edge_type": "also_view",
+                        "node_id": 78
+                    }
+                ],
+                [
+                    "get_documents",
+                    {
+                        "node_ids": [
+                            78
+                        ]
+                    }
+                ]
+            ]
+        },
+        {
+            "thought": "I found a map created by the US Forest Service: \"Trinity Alps Wilderness Area Map - Waterproof\" (id: 78). This is a detailed waterproof map of the Trinity Alps Wilderness Area in California with a scale of 1:126,720. Let me provide this as the answer.",
+            "actions": [
+                [
+                    "finish",
+                    {
+                        "answer_ids": [
+                            78
+                        ]
+                    }
+                ]
+            ]
+        }
+    ],
+    "input_tokens": 2031,
+    "generated_tokens": 441,
+    "latency": 5.924,
+    "id": 2
+}
