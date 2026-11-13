@@ -168,7 +168,11 @@ class AgenticRetriever(Retriever):
                     messages=messages,
                     think="high",
                     tools=tool_schemas,
-                    options={"temperature": self.temp, "seed": self.seed, "num_predict": 4096},
+                    options={
+                        "temperature": self.temp,
+                        "seed": self.seed,
+                        "num_predict": 4096,
+                    },
                 )
             except Exception as e:
                 log_dict["generation_error"] = str(e)
@@ -189,7 +193,9 @@ class AgenticRetriever(Retriever):
 
             step_actions = []
             for tc in response.message.tool_calls:
-                print(f"Tool call: {tc.function.name} with arguments {tc.function.arguments}")
+                print(
+                    f"Tool call: {tc.function.name} with arguments {tc.function.arguments}"
+                )
                 if (tc.function.name, tc.function.arguments) in all_actions:
                     messages.append(
                         {
@@ -218,7 +224,7 @@ class AgenticRetriever(Retriever):
                         finished = True
 
                         # handle cases where result is an error string in finish step
-                        if isinstance(answer_ids, list):
+                        if isinstance(result, list):
                             answer_ids = result[:top_k]
 
                     messages.append(
